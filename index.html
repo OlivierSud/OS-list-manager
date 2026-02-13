@@ -50,9 +50,20 @@
         <h1 id="header-title">Mes Listes</h1>
       </div>
 
-      <button id="settings-button" class="btn-icon">
-        <i data-lucide="settings"></i>
-      </button>
+      <div style="display: flex; gap: 0.25rem; align-items: center;">
+        <div id="search-container" class="hidden" style="position: relative; margin-right: 0.5rem;">
+          <i data-lucide="search"
+            style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-secondary);"></i>
+          <input type="text" id="search-input" placeholder="Rechercher..."
+            style="background: var(--bg-dark); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; padding: 4px 8px 4px 28px; font-size: 13px; width: 100px; outline: none; transition: width 0.3s; height: 28px;">
+        </div>
+        <button id="filter-button" class="btn-icon hidden">
+          <i data-lucide="filter"></i>
+        </button>
+        <button id="settings-button" class="btn-icon">
+          <i data-lucide="settings"></i>
+        </button>
+      </div>
     </header>
 
     <!-- Main Content -->

@@ -9,6 +9,9 @@ const fab = document.getElementById('fab');
 const taskInputContainer = document.getElementById('task-input-container');
 const newTaskInput = document.getElementById('new-task-input');
 const addTaskButton = document.getElementById('add-task-button');
+const filterButton = document.getElementById('filter-button');
+const searchContainer = document.getElementById('search-container');
+const searchInput = document.getElementById('search-input');
 const toggleHeaderMode = document.getElementById('toggle-header-mode');
 const loginContainer = document.getElementById('login-container');
 const loginButton = document.getElementById('login-button');
@@ -52,8 +55,14 @@ let state = {
     activeListId: null,
     lists: [],
     items: {},
-    isHeaderMode: false
+    isHeaderMode: false,
+    filter: 'all', // Global default, but we'll use per-list filters
+    searchQuery: ''
 };
+
+// Map to store per-list filters
+let listFilters = {};
+
 
 // --- Google Sheets & Auth Integration ---
 // TODO: User must replace this with their own OAuth 2.0 Client ID from Google Cloud Console
@@ -115,19 +124,29 @@ async function fetchSheetData() {
                 const title = sheet.properties.title;
                 const sheetId = sheet.properties.sheetId; // Number
 
-                // Add to Lists
-                const newList = {
-                    id: sheetId, // Keep as number for ID
-                    name: title,
-                    color: COLOR_PALETTE[index % COLOR_PALETTE.length], // Default color
-                    items: 0
-                };
-
-                // 3. Fetch Items
-                const dataResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(title)}!A:B`, {
+                // 3. Fetch Items (include Column C for config)
+                const dataResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(title)}!A:C`, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
                 const data = await dataResponse.json();
+
+                // Load filter from Column C (cell C1)
+                let savedFilter = 'all';
+                if (data.values && data.values[0] && data.values[0][2]) {
+                    const configStr = data.values[0][2];
+                    if (configStr.startsWith('FILTER:')) {
+                        savedFilter = configStr.replace('FILTER:', '');
+                    }
+                }
+
+                // Add to Lists
+                const newList = {
+                    id: sheetId,
+                    name: title,
+                    color: COLOR_PALETTE[index % COLOR_PALETTE.length],
+                    items: 0,
+                    filter: savedFilter
+                };
 
                 const items = [];
                 if (data.values) {
@@ -152,13 +171,13 @@ async function fetchSheetData() {
 
             const loadedLists = await Promise.all(fetchPromises);
             state.lists = loadedLists;
-
-            // Load colors from sheet metadata if available
-            await loadListColors();
-
-            console.log("Data sync complete:", state);
-            renderHome();
         }
+
+        // Load colors from sheet metadata if available
+        await loadListColors();
+
+        console.log("Data sync complete:", state);
+        renderHome();
     } catch (e) {
         console.error("Network or API Error", e);
     }
@@ -475,6 +494,45 @@ function closeColorModal() {
     colorModal.style.display = '';
 }
 
+function updateFilterButtonUI() {
+    if (!filterButton) return;
+
+    let iconName = 'list';
+    let label = 'Tout';
+    let color = 'var(--text-secondary)';
+
+    if (state.filter === 'active') {
+        iconName = 'square';
+        label = 'À faire';
+        color = 'var(--accent-color)';
+    } else if (state.filter === 'completed') {
+        iconName = 'check-square';
+        label = 'Fait';
+        color = 'var(--success-color)';
+    }
+
+    filterButton.innerHTML = `<i data-lucide="${iconName}"></i>`;
+    filterButton.style.color = color;
+    filterButton.title = `Filtre: ${label}`;
+    lucide.createIcons();
+}
+
+async function saveListFilter(sheetTitle, filterValue) {
+    if (!accessToken) return;
+    try {
+        // Write filter state to cell C1
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(sheetTitle)}!C1?valueInputOption=RAW`, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                values: [[`FILTER:${filterValue}`]]
+            })
+        });
+    } catch (e) {
+        console.error('Failed to save filter:', e);
+    }
+}
+
 // --- Render Functions ---
 
 function renderHome() {
@@ -500,6 +558,8 @@ function renderHome() {
     taskInputContainer.classList.add('hidden');
     fab.classList.remove('hidden'); // Show FAB to add new list
     if (settingsButton) settingsButton.classList.add('hidden'); // Hide settings in home view
+    if (filterButton) filterButton.classList.add('hidden'); // Hide filter in home view
+    if (searchContainer) searchContainer.classList.add('hidden'); // Hide search in home view
 
     headerTitle.innerText = "Mes Listes";
 
@@ -553,6 +613,14 @@ function renderList(listId) {
     taskInputContainer.classList.remove('hidden');
     fab.classList.add('hidden'); // Hide FAB, we use the input bar instead
     if (settingsButton) settingsButton.classList.remove('hidden'); // Show settings button in list view
+    if (filterButton) filterButton.classList.remove('hidden'); // Show filter button in list view
+    if (searchContainer) searchContainer.classList.remove('hidden'); // Show search in list view
+
+    // Set current filter from list state
+    state.filter = list.filter || 'all';
+
+    // Update filter button icon/style based on current mode
+    updateFilterButtonUI();
 
     // Update title with color badge
     const colorBadge = `<span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: ${list.color}; margin-right: 0.5rem; border: 1px solid rgba(255,255,255,0.2);"></span>`;
@@ -570,17 +638,43 @@ function renderList(listId) {
         let sectionCollapsed = false;
 
         currentItems.forEach((item, index) => {
+            // Apply filtering logic
+            if (!item.isHeader) {
+                // Filter by checkbox status
+                if (state.filter === 'active' && item.done) return;
+                if (state.filter === 'completed' && !item.done) return;
+
+                // Filter by search query
+                if (state.searchQuery && !item.text.toLowerCase().includes(state.searchQuery.toLowerCase())) {
+                    return;
+                }
+            }
+
             const el = document.createElement('div');
 
             if (item.isHeader) {
                 currentSectionIndex = index;
                 sectionCollapsed = collapsedSections.has(index);
 
-                // Count items in this section
+                // Count items in this section (respecting search and filter)
                 let itemCount = 0;
                 for (let i = index + 1; i < currentItems.length; i++) {
-                    if (currentItems[i].isHeader) break;
-                    itemCount++;
+                    const subItem = currentItems[i];
+                    if (subItem.isHeader) break;
+
+                    const matchesSearch = !state.searchQuery || subItem.text.toLowerCase().includes(state.searchQuery.toLowerCase());
+                    if (!matchesSearch) continue;
+
+                    if (state.filter === 'all') itemCount++;
+                    else if (state.filter === 'active' && !subItem.done) itemCount++;
+                    else if (state.filter === 'completed' && subItem.done) itemCount++;
+                }
+
+                // If search is active, don't show empty sections if they don't contain matching search items
+                // UNLESS the header itself matches the search
+                const headerMatchesSearch = !state.searchQuery || item.text.toLowerCase().includes(state.searchQuery.toLowerCase());
+                if (state.searchQuery && itemCount === 0 && !headerMatchesSearch) {
+                    return;
                 }
 
                 el.className = 'list-header';
@@ -702,6 +796,11 @@ function startInlineEdit(element, index) {
 function goHome() {
     state.activeListId = null;
     state.view = 'home';
+    state.searchQuery = '';
+    if (searchInput) {
+        searchInput.value = '';
+        searchInput.style.width = '100px';
+    }
     renderHome();
 }
 
@@ -958,6 +1057,21 @@ if (colorModal) colorModal.onclick = (e) => {
     if (e.target === colorModal) closeColorModal();
 };
 
+if (filterButton) filterButton.addEventListener('click', () => {
+    if (state.filter === 'all') state.filter = 'active';
+    else if (state.filter === 'active') state.filter = 'completed';
+    else state.filter = 'all';
+
+    // Save to local logic
+    const list = state.lists.find(l => l.id === state.activeListId);
+    if (list) {
+        list.filter = state.filter;
+        saveListFilter(list.name, state.filter);
+    }
+
+    renderList(state.activeListId);
+});
+
 if (settingsButton) settingsButton.addEventListener('click', () => {
     console.log('Settings clicked, state:', state.view, state.activeListId);
     // Only open options if we're in a list view
@@ -972,6 +1086,23 @@ if (settingsButton) settingsButton.addEventListener('click', () => {
         console.log('Not in list view or no active list');
     }
 });
+
+if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+        state.searchQuery = e.target.value;
+        renderList(state.activeListId);
+    });
+
+    // Focus effect
+    searchInput.addEventListener('focus', () => {
+        searchInput.style.width = '160px';
+    });
+    searchInput.addEventListener('blur', () => {
+        if (!searchInput.value) {
+            searchInput.style.width = '100px';
+        }
+    });
+}
 
 // --- Init ---
 window.onload = function () {
