@@ -595,7 +595,7 @@ function renderList(listId) {
                         <span class="collapse-arrow ${arrowClass}" data-section-index="${index}">
                             <i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i>
                         </span>
-                        <span>${item.text}</span>
+                        <span class="item-text" onclick="event.stopPropagation(); startInlineEdit(this, ${index})">${item.text}</span>
                         <span style="margin-left: 0.5rem; font-size: 0.75rem; opacity: 0.5; font-weight: 400;">(${itemCount})</span>
                     </div>
                     <button class="btn-delete-item" onclick="event.stopPropagation(); deleteListItem(${index})">
@@ -632,7 +632,7 @@ function renderList(listId) {
                     <div class="task-checkbox" onclick="event.stopPropagation(); toggleItem('${item.id}')">
                         ${checkIcon}
                     </div>
-                    <span style="flex: 1">${item.text}</span>
+                    <span class="item-text" style="flex: 1" onclick="event.stopPropagation(); startInlineEdit(this, ${index})">${item.text}</span>
                     <button class="btn-delete-item" onclick="event.stopPropagation(); deleteListItem(${index})">
                         <i data-lucide="x" style="width: 14px; height: 14px;"></i>
                     </button>
@@ -676,6 +676,37 @@ function deleteListItem(index) {
         renderList(listId);
         syncOrderToSheet(listId);
     }
+}
+
+function startInlineEdit(element, index) {
+    const originalText = element.innerText;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = originalText;
+    input.className = 'inline-edit-input';
+
+    // Save function
+    const save = () => {
+        const newText = input.value.trim();
+        if (newText && newText !== originalText) {
+            const listId = state.activeListId;
+            state.items[listId][index].text = newText;
+            syncOrderToSheet(listId);
+        }
+        renderList(state.activeListId);
+    };
+
+    input.onkeydown = (e) => {
+        if (e.key === 'Enter') save();
+        if (e.key === 'Escape') renderList(state.activeListId);
+    };
+
+    input.onblur = save;
+
+    element.innerHTML = '';
+    element.appendChild(input);
+    input.focus();
+    input.select();
 }
 
 function goHome() {

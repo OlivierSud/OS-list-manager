@@ -113,26 +113,43 @@ body {
     border: none;
     color: var(--text-secondary);
     cursor: pointer;
-    padding: 0.25rem;
+    padding: 0.4rem;
     border-radius: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
-    opacity: 0;
-}
-
-.task-item:hover .btn-delete-item,
-.list-header:hover .btn-delete-item {
-    opacity: 0.5;
+    opacity: 0.7;
+    /* Always visible */
 }
 
 .btn-delete-item:hover {
-    opacity: 1 !important;
-    background: rgba(239, 68, 68, 0.1);
+    opacity: 1;
+    background: rgba(239, 68, 68, 0.2);
     color: var(--danger-color);
 }
 
+.inline-edit-input {
+    background: var(--bg-dark);
+    border: 1px solid var(--accent-color);
+    color: var(--text-primary);
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: inherit;
+    width: 100%;
+    outline: none;
+}
+
+.item-text {
+    cursor: text;
+    padding: 2px 0;
+}
+
+.item-text:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 2px;
+}
 
 /* Components */
 /* Components */
