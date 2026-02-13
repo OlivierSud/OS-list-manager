@@ -663,19 +663,9 @@ function deleteListItem(index) {
     const items = state.items[listId];
     if (!items || !items[index]) return;
 
-    const itemText = items[index].text;
-    const isHeader = items[index].isHeader;
-
-    let confirmMsg = `Supprimer "${itemText}" ?`;
-    if (isHeader) {
-        confirmMsg = `Supprimer la section "${itemText}" ? Attention: cela ne supprimera pas les éléments à l'intérieur, ils seront rattachés à la section précédente.`;
-    }
-
-    if (confirm(confirmMsg)) {
-        items.splice(index, 1);
-        renderList(listId);
-        syncOrderToSheet(listId);
-    }
+    items.splice(index, 1);
+    renderList(listId);
+    syncOrderToSheet(listId);
 }
 
 function startInlineEdit(element, index) {

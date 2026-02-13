@@ -109,24 +109,29 @@ body {
 }
 
 .btn-delete-item {
-    background: transparent;
-    border: none;
-    color: var(--text-secondary);
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ff4d4d;
+    /* More vivid red for visibility */
     cursor: pointer;
-    padding: 0.4rem;
+    padding: 0.5rem;
     border-radius: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
-    opacity: 0.7;
-    /* Always visible */
+    opacity: 1;
+    /* Fully visible */
+    min-width: 32px;
+    min-height: 32px;
+    flex-shrink: 0;
+    /* Never squash on mobile */
+    margin-left: 0.5rem;
 }
 
 .btn-delete-item:hover {
-    opacity: 1;
-    background: rgba(239, 68, 68, 0.2);
-    color: var(--danger-color);
+    background: rgba(239, 68, 68, 0.4);
+    border-color: #ff4d4d;
 }
 
 .inline-edit-input {
@@ -273,6 +278,7 @@ h1 {
     justify-content: center;
     transition: all 0.1s;
     box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+    flex-shrink: 0;
 }
 
 .task-item.done .task-checkbox {
