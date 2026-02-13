@@ -4,6 +4,7 @@ const listsContainer = document.getElementById('lists-container');
 const tasksContainer = document.getElementById('tasks-container');
 const headerTitle = document.getElementById('header-title');
 const backButton = document.getElementById('back-button');
+const settingsButton = document.getElementById('settings-button');
 const fab = document.getElementById('fab');
 const taskInputContainer = document.getElementById('task-input-container');
 const newTaskInput = document.getElementById('new-task-input');
@@ -18,9 +19,32 @@ const btnRename = document.getElementById('btn-rename');
 const btnDuplicate = document.getElementById('btn-duplicate');
 const btnDelete = document.getElementById('btn-delete');
 const btnCancel = document.getElementById('btn-cancel');
+const btnColor = document.getElementById('btn-color');
+const colorModal = document.getElementById('color-modal');
+const colorGrid = document.getElementById('color-grid');
+const btnColorCancel = document.getElementById('btn-color-cancel');
 
 let currentListId = null;
 let currentListName = "";
+let collapsedSections = new Set(); // Track collapsed section indices
+let draggedElement = null;
+let draggedIndex = null;
+
+// Color palette for lists
+const COLOR_PALETTE = [
+    '#eb7600', // Blender Orange
+    '#3b82f6', // Blue
+    '#10b981', // Green
+    '#8b5cf6', // Purple
+    '#ef4444', // Red
+    '#f59e0b', // Amber
+    '#ec4899', // Pink
+    '#06b6d4', // Cyan
+    '#84cc16', // Lime
+    '#f97316', // Orange
+    '#6366f1', // Indigo
+    '#14b8a6'  // Teal
+];
 
 // State
 let state = {
@@ -95,7 +119,7 @@ async function fetchSheetData() {
                 const newList = {
                     id: sheetId, // Keep as number for ID
                     name: title,
-                    color: getRandomColor(index),
+                    color: COLOR_PALETTE[index % COLOR_PALETTE.length], // Default color
                     items: 0
                 };
 
@@ -128,6 +152,9 @@ async function fetchSheetData() {
 
             const loadedLists = await Promise.all(fetchPromises);
             state.lists = loadedLists;
+
+            // Load colors from sheet metadata if available
+            await loadListColors();
 
             console.log("Data sync complete:", state);
             renderHome();
@@ -254,7 +281,16 @@ async function renameSheet(sheetId, newName) {
         });
         const data = await response.json();
         if (!data.error) {
-            fetchSheetData();
+            // Update local state
+            const list = state.lists.find(l => l.id === sheetId);
+            if (list) list.name = newName;
+
+            // If we're currently viewing this list, stay in it
+            if (state.view === 'list' && state.activeListId === sheetId) {
+                renderList(sheetId);
+            } else {
+                fetchSheetData();
+            }
             return true;
         } else {
             alert("Erreur: " + data.error.message);
@@ -304,9 +340,139 @@ async function deleteSheet(sheetId) {
     } catch (e) { console.error(e); }
 }
 
+async function loadListColors() {
+    if (!accessToken) return;
+
+    try {
+        const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}?fields=sheets.properties`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        const data = await response.json();
+
+        if (data.sheets) {
+            data.sheets.forEach(sheet => {
+                const sheetId = sheet.properties.sheetId;
+                const tabColor = sheet.properties.tabColor;
+
+                if (tabColor) {
+                    const list = state.lists.find(l => l.id === sheetId);
+                    if (list) {
+                        // Convert RGB to hex
+                        const r = Math.round((tabColor.red || 0) * 255);
+                        const g = Math.round((tabColor.green || 0) * 255);
+                        const b = Math.round((tabColor.blue || 0) * 255);
+                        list.color = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+                    }
+                }
+            });
+        }
+    } catch (e) {
+        console.error('Failed to load colors:', e);
+    }
+}
+
+async function updateSheetColor(sheetId, hexColor) {
+    if (!accessToken) return;
+
+    // Convert hex to RGB (0-1 range)
+    const r = parseInt(hexColor.slice(1, 3), 16) / 255;
+    const g = parseInt(hexColor.slice(3, 5), 16) / 255;
+    const b = parseInt(hexColor.slice(5, 7), 16) / 255;
+
+    try {
+        const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                requests: [{
+                    updateSheetProperties: {
+                        properties: {
+                            sheetId: sheetId,
+                            tabColor: { red: r, green: g, blue: b }
+                        },
+                        fields: "tabColor"
+                    }
+                }]
+            })
+        });
+
+        const data = await response.json();
+        if (!data.error) {
+            // Update local state
+            const list = state.lists.find(l => l.id === sheetId);
+            if (list) list.color = hexColor;
+
+            // If we're currently viewing this list, stay in it
+            if (state.view === 'list' && state.activeListId === sheetId) {
+                renderList(sheetId);
+            } else {
+                renderHome();
+            }
+        } else {
+            alert("Erreur: " + data.error.message);
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function deleteSheet(sheetId) {
+    if (!accessToken) return;
+    try {
+        const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                requests: [{
+                    deleteSheet: {
+                        sheetId: sheetId
+                    }
+                }]
+            })
+        });
+        const data = await response.json();
+        if (!data.error) fetchSheetData();
+        else alert("Erreur: " + data.error.message);
+    } catch (e) { console.error(e); }
+}
+
 function getRandomColor(index) {
-    const colors = ['#3b82f6', '#10b981', '#8b5cf6', '#ef4444', '#f59e0b', '#ec4899'];
-    return colors[index % colors.length];
+    return COLOR_PALETTE[index % COLOR_PALETTE.length];
+}
+
+function initColorPicker() {
+    colorGrid.innerHTML = '';
+    COLOR_PALETTE.forEach(color => {
+        const colorBtn = document.createElement('button');
+        colorBtn.style.cssText = `
+            width: 40px;
+            height: 40px;
+            border-radius: 6px;
+            background: ${color};
+            border: 2px solid var(--border-color);
+            cursor: pointer;
+            transition: all 0.2s;
+        `;
+        colorBtn.onmouseover = () => colorBtn.style.transform = 'scale(1.1)';
+        colorBtn.onmouseout = () => colorBtn.style.transform = 'scale(1)';
+        colorBtn.onclick = () => {
+            updateSheetColor(currentListId, color);
+            closeColorModal();
+            closeOptions();
+        };
+        colorGrid.appendChild(colorBtn);
+    });
+}
+
+function openColorModal() {
+    initColorPicker();
+    colorModal.style.display = 'flex';
+    colorModal.classList.remove('hidden');
+}
+
+function closeColorModal() {
+    colorModal.classList.add('hidden');
+    colorModal.style.display = '';
 }
 
 // --- Render Functions ---
@@ -333,6 +499,7 @@ function renderHome() {
     backButton.classList.add('hidden');
     taskInputContainer.classList.add('hidden');
     fab.classList.remove('hidden'); // Show FAB to add new list
+    if (settingsButton) settingsButton.classList.add('hidden'); // Hide settings in home view
 
     headerTitle.innerText = "Mes Listes";
 
@@ -385,8 +552,11 @@ function renderList(listId) {
     backButton.classList.remove('hidden');
     taskInputContainer.classList.remove('hidden');
     fab.classList.add('hidden'); // Hide FAB, we use the input bar instead
+    if (settingsButton) settingsButton.classList.remove('hidden'); // Show settings button in list view
 
-    headerTitle.innerText = list.name;
+    // Update title with color badge
+    const colorBadge = `<span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: ${list.color}; margin-right: 0.5rem; border: 1px solid rgba(255,255,255,0.2);"></span>`;
+    headerTitle.innerHTML = colorBadge + list.name;
 
     // Clear and rebuild content
     tasksContainer.innerHTML = '';
@@ -396,26 +566,79 @@ function renderList(listId) {
     if (currentItems.length === 0) {
         tasksContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 2rem;">Aucun élément. Ajoutez-en un !</div>`;
     } else {
-        currentItems.forEach(item => {
+        let currentSectionIndex = -1;
+        let sectionCollapsed = false;
+
+        currentItems.forEach((item, index) => {
             const el = document.createElement('div');
 
             if (item.isHeader) {
+                currentSectionIndex = index;
+                sectionCollapsed = collapsedSections.has(index);
+
+                // Count items in this section
+                let itemCount = 0;
+                for (let i = index + 1; i < currentItems.length; i++) {
+                    if (currentItems[i].isHeader) break;
+                    itemCount++;
+                }
+
                 el.className = 'list-header';
-                el.innerHTML = `<span>${item.text}</span>`;
+                el.draggable = true;
+                el.dataset.index = index;
+                el.dataset.isHeader = 'true';
+
+                const arrowClass = sectionCollapsed ? 'collapsed' : '';
+                el.innerHTML = `
+                    <div style="display: flex; align-items: center; flex: 1;">
+                        <span class="drag-handle"><i data-lucide="grip-vertical" style="width: 16px; height: 16px;"></i></span>
+                        <span class="collapse-arrow ${arrowClass}" data-section-index="${index}">
+                            <i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i>
+                        </span>
+                        <span>${item.text}</span>
+                        <span style="margin-left: 0.5rem; font-size: 0.75rem; opacity: 0.5; font-weight: 400;">(${itemCount})</span>
+                    </div>
+                    <button class="btn-delete-item" onclick="event.stopPropagation(); deleteListItem(${index})">
+                        <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+                    </button>
+                `;
+
+                // Add collapse event listener
+                const arrow = el.querySelector('.collapse-arrow');
+                if (arrow) {
+                    arrow.onclick = (e) => {
+                        e.stopPropagation();
+                        toggleSection(index);
+                    };
+                }
+
+                setupDragHandlers(el, index, true);
             } else {
+                // Hide items if section is collapsed
+                if (sectionCollapsed && currentSectionIndex >= 0) {
+                    return; // Skip rendering
+                }
+
                 el.className = 'glass-panel task-item';
                 if (item.done) el.className += ' done';
-                el.onclick = () => toggleItem(item.id);
+                el.draggable = true;
+                el.dataset.index = index;
+                el.dataset.isHeader = 'false';
 
-                // Check icon logic
                 const checkIcon = item.done ? '<i data-lucide="check" style="width:16px; color: white;"></i>' : '';
 
                 el.innerHTML = `
-                    <div class="task-checkbox">
+                    <span class="drag-handle"><i data-lucide="grip-vertical" style="width: 16px; height: 16px;"></i></span>
+                    <div class="task-checkbox" onclick="event.stopPropagation(); toggleItem('${item.id}')">
                         ${checkIcon}
                     </div>
                     <span style="flex: 1">${item.text}</span>
+                    <button class="btn-delete-item" onclick="event.stopPropagation(); deleteListItem(${index})">
+                        <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+                    </button>
                 `;
+
+                setupDragHandlers(el, index, false);
             }
 
             tasksContainer.appendChild(el);
@@ -431,6 +654,28 @@ function openList(id) {
     state.activeListId = id;
     state.view = 'list';
     renderList(id);
+}
+
+function deleteListItem(index) {
+    const listId = state.activeListId;
+    if (!listId && listId !== 0) return;
+
+    const items = state.items[listId];
+    if (!items || !items[index]) return;
+
+    const itemText = items[index].text;
+    const isHeader = items[index].isHeader;
+
+    let confirmMsg = `Supprimer "${itemText}" ?`;
+    if (isHeader) {
+        confirmMsg = `Supprimer la section "${itemText}" ? Attention: cela ne supprimera pas les éléments à l'intérieur, ils seront rattachés à la section précédente.`;
+    }
+
+    if (confirm(confirmMsg)) {
+        items.splice(index, 1);
+        renderList(listId);
+        syncOrderToSheet(listId);
+    }
 }
 
 function goHome() {
@@ -517,6 +762,114 @@ function closeOptions() {
     currentListName = "";
 }
 
+function toggleSection(sectionIndex) {
+    if (collapsedSections.has(sectionIndex)) {
+        collapsedSections.delete(sectionIndex);
+    } else {
+        collapsedSections.add(sectionIndex);
+    }
+    renderList(state.activeListId);
+}
+
+function setupDragHandlers(element, index, isHeader) {
+    element.addEventListener('dragstart', (e) => {
+        draggedElement = element;
+        draggedIndex = index;
+        element.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+    });
+
+    element.addEventListener('dragend', (e) => {
+        element.classList.remove('dragging');
+        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    });
+
+    element.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+
+        if (draggedElement !== element) {
+            element.classList.add('drag-over');
+        }
+    });
+
+    element.addEventListener('dragleave', (e) => {
+        element.classList.remove('drag-over');
+    });
+
+    element.addEventListener('drop', (e) => {
+        e.preventDefault();
+        element.classList.remove('drag-over');
+
+        if (draggedElement === element) return;
+
+        const dropIndex = parseInt(element.dataset.index);
+        const dragIndex = draggedIndex;
+
+        if (dragIndex === dropIndex) return;
+
+        // Reorder items
+        const listId = state.activeListId;
+        const items = [...state.items[listId]];
+        const [movedItem] = items.splice(dragIndex, 1);
+
+        // If moving a header, move all items in that section
+        if (movedItem.isHeader) {
+            const sectionItems = [];
+            let i = dragIndex;
+            while (i < items.length && !items[i].isHeader) {
+                sectionItems.push(items.splice(dragIndex, 1)[0]);
+            }
+
+            // Insert header and section items
+            const insertIndex = dropIndex > dragIndex ? dropIndex - 1 : dropIndex;
+            items.splice(insertIndex, 0, movedItem, ...sectionItems);
+        } else {
+            items.splice(dropIndex > dragIndex ? dropIndex : dropIndex, 0, movedItem);
+        }
+
+        state.items[listId] = items;
+        renderList(listId);
+
+        // Sync to Google Sheets
+        syncOrderToSheet(listId);
+    });
+}
+
+async function syncOrderToSheet(listId) {
+    if (!accessToken) return;
+
+    const list = state.lists.find(l => l.id === listId);
+    if (!list) return;
+
+    const items = state.items[listId];
+    const values = items.map(item => [
+        item.text,
+        item.isHeader ? 'HEADER' : (item.done ? 'TRUE' : 'FALSE')
+    ]);
+
+    try {
+        // Clear and rewrite the entire sheet
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(list.name)}!A:B:clear`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(list.name)}!A:B?valueInputOption=USER_ENTERED`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ values })
+        });
+
+        console.log('Order synced to sheet');
+    } catch (e) {
+        console.error('Failed to sync order:', e);
+    }
+}
+
 // --- Event Listeners ---
 
 if (backButton) backButton.addEventListener('click', goHome);
@@ -575,10 +928,40 @@ if (btnDelete) btnDelete.onclick = () => {
     }
 };
 
+if (btnColor) btnColor.onclick = () => {
+    openColorModal();
+};
+
+if (btnColorCancel) btnColorCancel.onclick = closeColorModal;
+if (colorModal) colorModal.onclick = (e) => {
+    if (e.target === colorModal) closeColorModal();
+};
+
+if (settingsButton) settingsButton.addEventListener('click', () => {
+    console.log('Settings clicked, state:', state.view, state.activeListId);
+    // Only open options if we're in a list view
+    // Check for null/undefined explicitly because ID can be 0
+    if (state.view === 'list' && state.activeListId !== null && state.activeListId !== undefined) {
+        const list = state.lists.find(l => l.id === state.activeListId);
+        console.log('Found list:', list);
+        if (list) {
+            openOptions(null, list.id, list.name);
+        }
+    } else {
+        console.log('Not in list view or no active list');
+    }
+});
+
 // --- Init ---
 window.onload = function () {
     // Wait for Google Script to load then init
     // Or just call renderHome to show Login button
     initTokenClient();
     renderHome();
+    initColorPicker();
+
+    // Initialize settings button as hidden
+    if (settingsButton) {
+        settingsButton.classList.add('hidden');
+    }
 };

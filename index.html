@@ -50,7 +50,7 @@
         <h1 id="header-title">Mes Listes</h1>
       </div>
 
-      <button class="btn-icon">
+      <button id="settings-button" class="btn-icon">
         <i data-lucide="settings"></i>
       </button>
     </header>
@@ -78,8 +78,9 @@
       style="padding: 0.5rem; background: rgba(30, 41, 59, 0.9);">
 
       <button id="toggle-header-mode" class="btn-icon"
-        style="color: var(--text-secondary); width: 48px; border-radius: 8px;">
-        <i data-lucide="heading"></i>
+        style="color: var(--text-secondary); width: 48px; border-radius: 8px; position: relative;">
+        <i data-lucide="list"></i>
+        <i data-lucide="plus" style="position: absolute; width: 10px; height: 10px; top: 2px; right: 2px;"></i>
       </button>
 
       <input type="text" id="new-task-input" placeholder="Ajouter un élément..." class="input-field"
@@ -108,6 +109,11 @@
             <i data-lucide="copy"></i> Dupliquer
           </button>
 
+          <button id="btn-color" class="btn-icon"
+            style="width: 100%; border-radius: 0.5rem; justify-content: flex-start; gap: 0.75rem; font-size: 1rem; padding: 0.75rem; background: rgba(255,255,255,0.05);">
+            <i data-lucide="palette"></i> Couleur
+          </button>
+
           <button id="btn-delete" class="btn-icon"
             style="width: 100%; border-radius: 0.5rem; justify-content: flex-start; gap: 0.75rem; font-size: 1rem; padding: 0.75rem; background: rgba(239, 68, 68, 0.1); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.2);">
             <i data-lucide="trash-2"></i> Supprimer
@@ -118,6 +124,25 @@
             Annuler
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- Color Picker Modal -->
+    <div id="color-modal" class="hidden"
+      style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 201; backdrop-filter: blur(4px);">
+      <div class="glass-panel"
+        style="width: 90%; max-width: 320px; padding: 1.5rem; background: #1e293b; border: 1px solid var(--border-color);">
+        <h3 style="margin-top:0; margin-bottom: 1rem;">Choisir une couleur</h3>
+
+        <div id="color-grid"
+          style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.75rem; margin-bottom: 1.5rem;">
+          <!-- Colors will be populated by JS -->
+        </div>
+
+        <button id="btn-color-cancel" class="btn-icon"
+          style="width: 100%; border-radius: 0.5rem; justify-content: center; font-size: 1rem; padding: 0.75rem;">
+          Annuler
+        </button>
       </div>
     </div>
 
