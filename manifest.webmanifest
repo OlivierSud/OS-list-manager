@@ -1,0 +1,21 @@
+{
+    "name": "OS List Manager",
+    "short_name": "OS List",
+    "description": "Gestionnaire de listes technique style Blender",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "background_color": "#1d1d1d",
+    "theme_color": "#eb7600",
+    "icons": [
+        {
+            "src": "https://lucide.dev/api/icons/list-todo?color=eb7600&size=192",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "https://lucide.dev/api/icons/list-todo?color=eb7600&size=512",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

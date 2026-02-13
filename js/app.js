@@ -21,6 +21,7 @@ const modalDesc = document.getElementById('modal-desc');
 const btnRename = document.getElementById('btn-rename');
 const btnDuplicate = document.getElementById('btn-duplicate');
 const btnDelete = document.getElementById('btn-delete');
+const btnLogout = document.getElementById('btn-logout');
 const btnCancel = document.getElementById('btn-cancel');
 const btnColor = document.getElementById('btn-color');
 const colorModal = document.getElementById('color-modal');
@@ -60,6 +61,37 @@ let state = {
     searchQuery: ''
 };
 
+// PWA Install Prompt
+let deferredPrompt;
+const pwaBanner = document.getElementById('pwa-install-banner');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    console.log('PWA persistent prompt ready');
+
+    // Show banner only if we are in Home view AND not already installed
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    if (state.view === 'home' && !isStandalone) {
+        if (pwaBanner) pwaBanner.classList.remove('hidden');
+    }
+});
+
+// Function to trigger PWA install manually if needed
+function installPWAFromBanner() {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+            if (choiceResult.outcome === 'accepted') {
+                console.log('User accepted the PWA install');
+                if (pwaBanner) pwaBanner.classList.add('hidden');
+            }
+            deferredPrompt = null;
+        });
+    }
+}
+
+
 // Map to store per-list filters
 let listFilters = {};
 
@@ -82,12 +114,48 @@ function initTokenClient() {
             scope: SCOPES,
             callback: (tokenResponse) => {
                 accessToken = tokenResponse.access_token;
-                console.log("Access Token received");
+                // Save token and expiry
+                const expiry = Date.now() + (tokenResponse.expires_in * 1000);
+                localStorage.setItem('google_access_token', accessToken);
+                localStorage.setItem('google_token_expiry', expiry);
+
+                console.log("Access Token received and saved");
                 renderHome(); // Re-render to show app instead of login
                 fetchSheetData(); // Fetch data now that we are logged in
             },
         });
+
+        // Try to recover session
+        checkPersistentAuth();
     }
+}
+
+function checkPersistentAuth() {
+    const savedToken = localStorage.getItem('google_access_token');
+    const expiry = localStorage.getItem('google_token_expiry');
+
+    if (savedToken && expiry && Date.now() < parseInt(expiry)) {
+        accessToken = savedToken;
+        console.log("Restored session from localStorage");
+        fetchSheetData(); // Fetch data immediately
+        renderHome();
+    }
+}
+
+function handleLogout() {
+    // Revoke token with Google if possible
+    if (window.google && accessToken) {
+        google.accounts.oauth2.revoke(accessToken, () => {
+            console.log('Token revoked');
+        });
+    }
+
+    accessToken = null;
+    localStorage.removeItem('google_access_token');
+    localStorage.removeItem('google_token_expiry');
+
+    goHome(); // This will trigger renderHome and show login since accessToken is null
+    closeOptions();
 }
 
 function handleAuthClick() {
@@ -561,6 +629,11 @@ function renderHome() {
     if (filterButton) filterButton.classList.add('hidden'); // Hide filter in home view
     if (searchContainer) searchContainer.classList.add('hidden'); // Hide search in home view
 
+    // Show PWA banner if available
+    if (deferredPrompt && pwaBanner) {
+        pwaBanner.classList.remove('hidden');
+    }
+
     headerTitle.innerText = "Mes Listes";
 
     // Clear and rebuild content
@@ -615,6 +688,9 @@ function renderList(listId) {
     if (settingsButton) settingsButton.classList.remove('hidden'); // Show settings button in list view
     if (filterButton) filterButton.classList.remove('hidden'); // Show filter button in list view
     if (searchContainer) searchContainer.classList.remove('hidden'); // Show search in list view
+
+    // Hide PWA banner in list view
+    if (pwaBanner) pwaBanner.classList.add('hidden');
 
     // Set current filter from list state
     state.filter = list.filter || 'all';
@@ -1051,6 +1127,8 @@ if (btnDelete) btnDelete.onclick = () => {
 if (btnColor) btnColor.onclick = () => {
     openColorModal();
 };
+
+if (btnLogout) btnLogout.onclick = handleLogout;
 
 if (btnColorCancel) btnColorCancel.onclick = closeColorModal;
 if (colorModal) colorModal.onclick = (e) => {

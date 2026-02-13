@@ -3,14 +3,14 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mes Listes</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1d1d1d">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>OS List Manager</title>
 
   <!-- PWA Settings -->
-  <meta name="theme-color" content="#3b82f6" />
   <meta name="description"
     content="Une application simple et puissante pour gérer vos listes de tâches et courses. Synchronisation Google Sheets." />
-  <link rel="manifest" href="manifest.json">
 
   <!-- Fonts & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -40,6 +40,20 @@
   </div>
 
   <div id="app">
+
+    <!-- PWA Install Banner (Mobile Only) -->
+    <div id="pwa-install-banner" class="hidden glass-panel"
+      style="margin: 1rem; padding: 1rem; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--accent-color);">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <i data-lucide="download" style="color: var(--accent-color);"></i>
+        <div>
+          <div style="font-weight: 600; font-size: 0.9rem;">Installer l'application</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Accès rapide depuis l'écran d'accueil</div>
+        </div>
+      </div>
+      <button onclick="installPWAFromBanner()" class="btn-send"
+        style="width: auto; padding: 0.5rem 1rem; font-size: 0.8rem;">Installer</button>
+    </div>
 
     <!-- Header -->
     <header class="glass-panel">
@@ -128,6 +142,13 @@
           <button id="btn-delete" class="btn-icon"
             style="width: 100%; border-radius: 0.5rem; justify-content: flex-start; gap: 0.75rem; font-size: 1rem; padding: 0.75rem; background: rgba(239, 68, 68, 0.1); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.2);">
             <i data-lucide="trash-2"></i> Supprimer
+          </button>
+
+          <hr style="border: none; border-top: 1px solid var(--border-color); margin: 0.5rem 0;">
+
+          <button id="btn-logout" class="btn-icon"
+            style="width: 100%; border-radius: 0.5rem; justify-content: flex-start; gap: 0.75rem; font-size: 1rem; padding: 0.75rem; background: rgba(255,255,255,0.05); color: var(--text-secondary);">
+            <i data-lucide="log-out"></i> Déconnexion
           </button>
 
           <button id="btn-cancel" class="btn-icon"
