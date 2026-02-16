@@ -58,7 +58,8 @@ let state = {
     items: {},
     isHeaderMode: false,
     filter: 'all', // Global default, but we'll use per-list filters
-    searchQuery: ''
+    searchQuery: '',
+    userEmail: null
 };
 
 // PWA Install Prompt
@@ -101,7 +102,7 @@ let listFilters = {};
 const CLIENT_ID = '356152485310-ofia0pr8hcig7s906tfu1c9v1us7s4gb.apps.googleusercontent.com';
 const API_KEY = 'AIzaSyBA2lV9mm9_tNIpErOd9yO5lMjlIYtlCwM';
 const SPREADSHEET_ID = '17nkELFwjGJrOjCBHTunDsAdg1GE6ylIZYc6jblAB-ps';
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
+const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email openid';
 
 let tokenClient;
 let accessToken = null;
@@ -120,8 +121,10 @@ function initTokenClient() {
                 localStorage.setItem('google_token_expiry', expiry);
 
                 console.log("Access Token received and saved");
-                renderHome(); // Re-render to show app instead of login
-                fetchSheetData(); // Fetch data now that we are logged in
+                fetchUserEmail().then(() => {
+                    renderHome();
+                    fetchSheetData();
+                });
             },
         });
 
@@ -137,8 +140,23 @@ function checkPersistentAuth() {
     if (savedToken && expiry && Date.now() < parseInt(expiry)) {
         accessToken = savedToken;
         console.log("Restored session from localStorage");
+        fetchUserEmail();
         fetchSheetData(); // Fetch data immediately
         renderHome();
+    }
+}
+
+async function fetchUserEmail() {
+    if (!accessToken) return;
+    try {
+        const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        const data = await response.json();
+        state.userEmail = data.email;
+        console.log("Logged in as:", state.userEmail);
+    } catch (e) {
+        console.error("Failed to fetch user email", e);
     }
 }
 
@@ -192,8 +210,8 @@ async function fetchSheetData() {
                 const title = sheet.properties.title;
                 const sheetId = sheet.properties.sheetId; // Number
 
-                // 3. Fetch Items (include Column C for config)
-                const dataResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(title)}!A:C`, {
+                // 3. Fetch Items (include Column D for last modifier)
+                const dataResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(title)}!A:D`, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
                 const data = await dataResponse.json();
@@ -227,7 +245,8 @@ async function fetchSheetData() {
                             id: `${sheetId}-${rowIndex}`,
                             text: row[0],
                             done: row[1] === "TRUE",
-                            isHeader: isHeader
+                            isHeader: isHeader,
+                            lastModifier: row[3] || "" // Column D
                         });
                     });
                 }
@@ -291,14 +310,14 @@ async function addItemToSheet(listId, text, isHeader = false) {
     const statusValue = isHeader ? "HEADER" : "FALSE";
 
     try {
-        const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(list.name)}!A:B:append?valueInputOption=USER_ENTERED`, {
+        const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(list.name)}!A:D:append?valueInputOption=USER_ENTERED`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                values: [[text, statusValue]]
+                values: [[text, statusValue, "", state.userEmail || ""]]
             })
         });
 
@@ -328,8 +347,8 @@ async function toggleItemInSheet(listId, itemId, newStatus) {
     const list = state.lists.find(l => l.id === listId);
 
     // Row index in sheet is 1-based usually for A1 notation, but values array is 0-based.
-    // A1 notation: Sheet!B{rowIndex+1}
-    const range = `${list.name}!B${rowIndex + 1}`;
+    // A1 notation: Sheet!B{rowIndex+1}:D{rowIndex+1}
+    const range = `${list.name}!B${rowIndex + 1}:D${rowIndex + 1}`;
 
     try {
         // Prevent toggling headers if somehow triggered
@@ -343,9 +362,17 @@ async function toggleItemInSheet(listId, itemId, newStatus) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                values: [[newStatus ? "TRUE" : "FALSE"]]
+                // Range B:D, update B (status) and D (email), leave C (config) untouched if possible or empty
+                // Note: updating a range like B:D with empty string in middle might affect C1
+                // For simplicity we use a 1x3 array
+                values: [[newStatus ? "TRUE" : "FALSE", "", state.userEmail || ""]]
             })
         });
+
+        // Update local state modifier as well
+        const items = state.items[listId];
+        const item = items.find(i => i.id === itemId);
+        if (item) item.lastModifier = state.userEmail;
     } catch (e) {
         console.error("Update failed", e);
     }
@@ -984,7 +1011,10 @@ function setupDragHandlers(element, index, isHeader) {
 
     element.addEventListener('dragend', (e) => {
         element.classList.remove('dragging');
-        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        document.querySelectorAll('.drag-over, .drag-over-header').forEach(el => {
+            el.classList.remove('drag-over');
+            el.classList.remove('drag-over-header');
+        });
     });
 
     element.addEventListener('dragover', (e) => {
@@ -992,17 +1022,23 @@ function setupDragHandlers(element, index, isHeader) {
         e.dataTransfer.dropEffect = 'move';
 
         if (draggedElement !== element) {
-            element.classList.add('drag-over');
+            if (element.dataset.isHeader === 'true' && draggedElement.dataset.isHeader === 'false') {
+                element.classList.add('drag-over-header');
+            } else {
+                element.classList.add('drag-over');
+            }
         }
     });
 
     element.addEventListener('dragleave', (e) => {
         element.classList.remove('drag-over');
+        element.classList.remove('drag-over-header');
     });
 
     element.addEventListener('drop', (e) => {
         e.preventDefault();
         element.classList.remove('drag-over');
+        element.classList.remove('drag-over-header');
 
         if (draggedElement === element) return;
 
@@ -1037,7 +1073,6 @@ function setupDragHandlers(element, index, isHeader) {
                 newDropIndex -= sectionToMove.length;
                 // If dropped on an item of another section when moving a header,
                 // we move to after that entire section to keep it intact.
-                // find the end of target's section
                 while (newDropIndex + 1 < items.length && !items[newDropIndex + 1].isHeader) {
                     newDropIndex++;
                 }
@@ -1054,11 +1089,19 @@ function setupDragHandlers(element, index, isHeader) {
         } else {
             // Moving a single item
             const [item] = items.splice(dragIndex, 1);
-            let newDropIndex = dropIndex;
-            if (dropIndex > dragIndex) {
-                newDropIndex--;
+            let targetIndex = dropIndex;
+
+            // Adjust index if moving down
+            if (dropIndex > dragIndex) targetIndex--;
+
+            const dropOnHeader = element.dataset.isHeader === 'true';
+            if (dropOnHeader) {
+                // If drop on a header, place it as the first item of that section
+                // The targetIndex is currently the header's index. We want index + 1
+                items.splice(targetIndex + 1, 0, item);
+            } else {
+                items.splice(targetIndex, 0, item);
             }
-            items.splice(newDropIndex, 0, item);
         }
 
         state.items[listId] = items;
@@ -1078,17 +1121,19 @@ async function syncOrderToSheet(listId) {
     const items = state.items[listId];
     const values = items.map(item => [
         item.text,
-        item.isHeader ? 'HEADER' : (item.done ? 'TRUE' : 'FALSE')
+        item.isHeader ? 'HEADER' : (item.done ? 'TRUE' : 'FALSE'),
+        "", // Column C
+        item.lastModifier || "" // Column D
     ]);
 
     try {
-        // Clear and rewrite the entire sheet
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(list.name)}!A:B:clear`, {
+        // Clear and rewrite the entire sheet A:D
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(list.name)}!A:D:clear`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
 
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(list.name)}!A:B?valueInputOption=USER_ENTERED`, {
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(list.name)}!A:D?valueInputOption=USER_ENTERED`, {
             method: 'PUT',
             headers: {
                 'Authorization': `Bearer ${accessToken}`,

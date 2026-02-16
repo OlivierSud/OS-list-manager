@@ -321,6 +321,12 @@ h1 {
     border-top: 2px solid var(--accent-color) !important;
 }
 
+.drag-over-header {
+    border: 2px solid var(--accent-color) !important;
+    background: rgba(235, 118, 0, 0.1) !important;
+    border-radius: var(--radius-md);
+}
+
 /* Collapse Arrow */
 .collapse-arrow {
     cursor: pointer;
