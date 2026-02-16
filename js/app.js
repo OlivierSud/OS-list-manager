@@ -252,20 +252,28 @@ async function fetchSheetData() {
                         let pid = parts.find(p => p.startsWith('PID:'))?.replace('PID:', '');
                         let color = parts.find(p => p.startsWith('COLOR:'))?.replace('COLOR:', '');
                         let isStandalone = parts.includes('STANDALONE');
-                        const isSubHeader = parts.includes('SUBHEADER');
+                        let isSubHeader = parts.includes('SUBHEADER');
 
                         // Backward compatibility and inference
                         if (isHeader) {
                             if (!uid) uid = generateId();
                             lastHeaderUid = uid;
+                            // If a header has a PID, it implies it is a subheader
+                            if (pid) isSubHeader = true;
                         } else {
-                            // It's a task. If it has no PID and is not explicitly standalone, 
+                            // It's a task. A task can't be a subheader.
+                            isSubHeader = false;
+
+                            // If it has no PID and is not explicitly standalone, 
                             // it likely belongs to the preceding header.
                             if (!pid && !isStandalone) {
-                                pid = lastHeaderUid;
+                                if (lastHeaderUid) {
+                                    pid = lastHeaderUid;
+                                } else {
+                                    // Only truly standalone if there is NO preceding header at all (top of list)
+                                    isStandalone = true;
+                                }
                             }
-                            // Still no pid? Then it's standalone (top of the list)
-                            if (!pid) isStandalone = true;
                         }
 
                         // Extract filter from row 0 if present (FILTER: All|Active|Completed)
@@ -853,28 +861,53 @@ function renderList(listId) {
                     }
                 }
 
-                // Position-based counting: count everything until the next section of same or higher level
+                // Robust counting with explicit depth tracking
                 let itemCount = 0;
+                // depth 0 = Main Section, depth 1 = Sub Section
+                const currentDepth = (isSub) ? 1 : 0;
+
                 for (let i = index + 1; i < currentItems.length; i++) {
                     const subItem = currentItems[i];
 
-                    // Boundary check:
-                    if (subItem.isHeader) {
-                        // If we are a main section, we stop only at another MAIN section (sub-sections are part of us)
-                        if (!isSub && subItem.isSubHeader) {
-                            continue;
+                    // 1. Check for Standalone Divider (Items that break sections)
+                    if (!subItem.isHeader) {
+                        // If an item is standalone (no parent), it breaks ANY section scope
+                        if (subItem.isStandalone || !subItem.parentId) {
+                            break;
                         }
-                        // If we are a sub-section, we stop at ANY header (another sub or a new main)
-                        break;
                     }
 
-                    // Content check (Search & Filter)
-                    const matchesSearch = !state.searchQuery || subItem.text.toLowerCase().includes(state.searchQuery.toLowerCase());
-                    if (!matchesSearch) continue;
+                    // 2. Check for Header Boundaries
+                    if (subItem.isHeader) {
+                        const subIsSub = subItem.isSubHeader || !!subItem.parentId;
 
-                    if (state.filter === 'all' || (state.filter === 'active' && !subItem.done) || (state.filter === 'completed' && subItem.done)) {
-                        itemCount++;
+                        if (currentDepth === 0) {
+                            // We are Main Section
+                            if (subIsSub) {
+                                // It's a Sub-Header. Nesting. Continue loop.
+                                continue;
+                            } else {
+                                // It's another Main Header. Stop.
+                                break;
+                            }
+                        } else {
+                            // We are Sub Section
+                            // Any header (Main or Sub) stops us.
+                            break;
+                        }
                     }
+
+                    // Content Check (Search)
+                    if (state.searchQuery && !subItem.text.toLowerCase().includes(state.searchQuery.toLowerCase())) {
+                        continue;
+                    }
+
+                    // Filter Check
+                    const isDone = subItem.done === true || subItem.done === 'TRUE';
+                    if (state.filter === 'active' && isDone) continue;
+                    if (state.filter === 'completed' && !isDone) continue;
+
+                    itemCount++;
                 }
 
 
@@ -904,7 +937,7 @@ function renderList(listId) {
                         </span>
                         ${colorBullet}
                         <span class="item-text" onclick="event.stopPropagation(); startInlineEdit(this, ${index})">${item.text}</span>
-                        <span style="margin-left: 0.5rem; font-size: 0.75rem; opacity: 0.5; font-weight: 400;">(${itemCount})</span>
+                        <span class="section-count" style="margin-left: 0.5rem; font-size: 0.8rem; opacity: 0.8; font-weight: bold; color: var(--text-secondary);">(${itemCount})</span>
                     </div>
                     <div style="display: flex; gap: 0.25rem;">
                         <button class="btn-icon-small" onclick="event.stopPropagation(); openSectionOptions(${index})">
