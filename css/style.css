@@ -191,6 +191,10 @@ header {
     align-items: center;
     justify-content: space-between;
     padding: 1rem;
+    margin-bottom: 2rem;
+    /* Increased spacing between title and items */
+    /* Add a subtle technical line under the header for better demarcation */
+    border-bottom: 2px solid var(--accent-color);
 }
 
 h1 {
@@ -354,6 +358,8 @@ h1 {
     font-size: 0.85rem;
     border-bottom: 2px solid rgba(255, 255, 255, 0.1);
     margin-top: 0.5rem;
+    margin-bottom: 0.75rem;
+    /* Space before first item in section */
     display: flex;
     align-items: center;
     justify-content: space-between;

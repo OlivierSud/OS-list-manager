@@ -1094,13 +1094,21 @@ function setupDragHandlers(element, index, isHeader) {
             // Adjust index if moving down
             if (dropIndex > dragIndex) targetIndex--;
 
-            const dropOnHeader = element.dataset.isHeader === 'true';
-            if (dropOnHeader) {
-                // If drop on a header, place it as the first item of that section
-                // The targetIndex is currently the header's index. We want index + 1
-                items.splice(targetIndex + 1, 0, item);
+            // Special Logic: If moving to very top or very bottom, it stays out of any section
+            if (targetIndex === 0) {
+                // Drop at the very beginning (above any section)
+                items.splice(0, 0, item);
+            } else if (targetIndex >= items.length) {
+                // Drop at the very end
+                items.push(item);
             } else {
-                items.splice(targetIndex, 0, item);
+                const dropOnHeader = element.dataset.isHeader === 'true';
+                if (dropOnHeader) {
+                    // If drop on a header, place it as the first item of that section
+                    items.splice(targetIndex + 1, 0, item);
+                } else {
+                    items.splice(targetIndex, 0, item);
+                }
             }
         }
 
