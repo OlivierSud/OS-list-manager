@@ -1268,10 +1268,12 @@ function setupDragHandlers(element, index, isHeader) {
     element.addEventListener('dragend', (e) => {
         element.classList.remove('dragging');
         tasksContainer.classList.remove('dragging-active');
-        document.querySelectorAll('.drag-over, .drag-over-header, .drag-over-boundary').forEach(el => {
+        document.querySelectorAll('.drag-over, .drag-over-header, .drag-over-boundary, .drag-over-top, .drag-over-bottom').forEach(el => {
             el.classList.remove('drag-over');
             el.classList.remove('drag-over-header');
             el.classList.remove('drag-over-boundary');
+            el.classList.remove('drag-over-top');
+            el.classList.remove('drag-over-bottom');
         });
     });
 
@@ -1280,37 +1282,77 @@ function setupDragHandlers(element, index, isHeader) {
         e.dataTransfer.dropEffect = 'move';
 
         if (draggedElement !== element) {
+            const rect = element.getBoundingClientRect();
+            const relY = e.clientY - rect.top;
+            const isTop = relY < (rect.height / 2);
+
+            // Clean up strictly
+            element.classList.remove('drag-over-top', 'drag-over-bottom', 'drag-over-header');
+
             if (element.dataset.isHeader === 'true' && draggedElement.dataset.isHeader === 'false') {
-                element.classList.add('drag-over-header');
+                // Dragging Item ON Header
+                // If top half -> Insert BEFORE header (sibling)
+                // If bottom half -> Insert INTO header (child)
+                if (isTop) {
+                    element.classList.add('drag-over-top');
+                } else {
+                    // Use header style for nesting feedback to be distinct? 
+                    // User asked for "orange line below". Let's stick to consistent line feedback.
+                    // But changing style might be better for "nesting". 
+                    // Let's use the line for exact positioning.
+                    element.classList.add('drag-over-bottom');
+                }
             } else {
-                element.classList.add('drag-over');
+                // Item/Item or Header/Header
+                if (isTop) {
+                    element.classList.add('drag-over-top');
+                } else {
+                    element.classList.add('drag-over-bottom');
+                }
             }
         }
     });
 
     element.addEventListener('dragleave', (e) => {
-        element.classList.remove('drag-over');
-        element.classList.remove('drag-over-header');
+        element.classList.remove('drag-over', 'drag-over-header', 'drag-over-top', 'drag-over-bottom');
     });
 
     element.addEventListener('drop', (e) => {
         e.preventDefault();
-        element.classList.remove('drag-over');
-        element.classList.remove('drag-over-header');
+        element.classList.remove('drag-over', 'drag-over-header', 'drag-over-top', 'drag-over-bottom');
 
         if (draggedElement === element) return;
+
+        const rect = element.getBoundingClientRect();
+        const relY = e.clientY - rect.top;
+        const insertAfter = relY >= (rect.height / 2);
 
         const dropIndex = parseInt(element.dataset.index);
         const dragIndex = draggedIndex;
 
-        if (dragIndex === dropIndex) return;
+        // Visual check: if we drop exactly where we are, do nothing
+        // (Logic below handles indices, but this saves processing)
+        if (dragIndex === dropIndex && !insertAfter) return; // Drop on self top
+        if (dragIndex === dropIndex && insertAfter) return;  // Drop on self bottom
 
         const listId = state.activeListId;
         const items = [...state.items[listId]];
         const movedItem = items[dragIndex];
 
-        // If moving a header, move all items in that section
+        // 1. Determine Target Index
+        let targetIndex = dropIndex;
+        if (insertAfter) targetIndex++;
+
+        // 2. Adjust for Removal of dragged item
+        // If we remove the item from a position BEFORE the target, the target index shifts down
+        if (dragIndex < targetIndex) {
+            targetIndex--;
+        }
+
+        // Logic split: Moving Section vs Moving Item
         if (movedItem.isHeader) {
+            // -- SECTION MOVE --
+            // We grab the whole section
             const sectionToMove = [];
             let i = dragIndex;
             sectionToMove.push(items[i++]);
@@ -1318,70 +1360,81 @@ function setupDragHandlers(element, index, isHeader) {
                 sectionToMove.push(items[i++]);
             }
 
+            // Safety: Don't drop inside yourself
             if (dropIndex >= dragIndex && dropIndex < dragIndex + sectionToMove.length) return;
 
+            // Remove logic
             items.splice(dragIndex, sectionToMove.length);
 
-            let newDropIndex = dropIndex;
-            if (dropIndex > dragIndex) {
-                newDropIndex -= sectionToMove.length;
+            // Re-calculate target index because we might have removed MORE than 1 item
+            // Original targetIndex calc assumed 1 item removal.
+            // Let's restart index calc for Header specific case to be safe.
+            let realTargetIndex = dropIndex;
+            if (insertAfter) realTargetIndex++;
+
+            if (dragIndex < realTargetIndex) {
+                realTargetIndex -= sectionToMove.length;
             }
 
-            // Nesting logic: become SubHeader if dropped into a main section
-            let dropParentMain = null;
-            for (let j = newDropIndex - 1; j >= 0; j--) {
+            // Insert logic
+            items.splice(realTargetIndex, 0, ...sectionToMove);
+
+            // Parent ID update for Header (Nesting)
+            // We look at who we dropped onto or near.
+            // But relying on "dropIndex" item properties is safest before splice.
+            // Let's check the New Neighbors in `items`?
+            // Or use the `dropIndex` element's properties.
+
+            const targetEl = state.items[listId][dropIndex]; // Pre-move state
+            // If we dropped INTO a main header section?
+            // Complexity: A header doesn't really have a parent unless it's a SubHeader.
+            // If we drop inside a Main Section, we become SubHeader.
+
+            // Let's use scan-up logic from new position
+            let newParentMain = null;
+            for (let j = realTargetIndex - 1; j >= 0; j--) {
                 if (items[j].isHeader && !items[j].isSubHeader) {
-                    dropParentMain = items[j];
+                    newParentMain = items[j];
                     break;
                 }
             }
 
-            if (dropParentMain) {
-                console.log(`Nesting section "${sectionToMove[0].text}" into main section "${dropParentMain.text}"`);
+            if (newParentMain) {
                 sectionToMove[0].isSubHeader = true;
-                sectionToMove[0].isStandalone = false;
-                sectionToMove[0].parentId = dropParentMain.id;
+                sectionToMove[0].parentId = newParentMain.id;
             } else {
-                console.log(`Setting section "${sectionToMove[0].text}" as main section`);
                 sectionToMove[0].isSubHeader = false;
                 sectionToMove[0].parentId = null;
             }
 
-            // Update parentId for all items in the moved section to stay with this header
+            // Update children parentId
             sectionToMove.forEach(it => {
                 if (!it.isHeader) it.parentId = sectionToMove[0].id;
             });
 
-            items.splice(newDropIndex, 0, ...sectionToMove);
         } else {
-            // Moving a single item
-            const [item] = items.splice(dragIndex, 1);
-            let targetIndex = dropIndex;
-            if (dropIndex > dragIndex) targetIndex--;
+            // -- ITEM MOVE --
+            const targetEl = items[dropIndex]; // The element we dropped ON
 
-            const dropOnHeader = element.dataset.isHeader === 'true';
+            // Remove
+            items.splice(dragIndex, 1);
 
-            if (dropOnHeader) {
-                const targetHeader = items[targetIndex];
-                item.isStandalone = false;
-                item.isSubHeader = false;
-                item.parentId = targetHeader.id;
-                items.splice(targetIndex + 1, 0, item);
-            } else if (targetIndex === 0) {
-                item.isStandalone = true;
-                item.parentId = null;
-                items.splice(0, 0, item);
-            } else if (targetIndex >= items.length) {
-                item.isStandalone = true;
-                item.parentId = null;
-                items.push(item);
+            // Insert
+            items.splice(targetIndex, 0, movedItem);
+
+            // Update Parent ID based on Drop Target
+            if (targetEl.isHeader && insertAfter) {
+                // Dropped explicitly BELOW a header -> Enters that section
+                movedItem.parentId = targetEl.id;
+                movedItem.isStandalone = false;
+            } else if (targetEl.isHeader && !insertAfter) {
+                // Dropped explicitly ABOVE a header -> Joins previous section
+                movedItem.parentId = targetEl.parentId; // Header's parent (null if main)
+                movedItem.isStandalone = !movedItem.parentId;
             } else {
-                const targetItem = items[targetIndex];
-                if (targetItem) {
-                    item.isStandalone = targetItem.isStandalone;
-                    item.parentId = targetItem.parentId;
-                }
-                items.splice(targetIndex, 0, item);
+                // Dropped on an Item (Top or Bottom) -> Adopts that Item's parent
+                movedItem.parentId = targetEl.parentId;
+                movedItem.isStandalone = targetEl.isStandalone;
             }
         }
 

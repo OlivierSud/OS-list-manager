@@ -371,7 +371,16 @@ h1 {
 }
 
 .drag-over {
+    /* Kept for generic drop zones, although ideally replaced */
     border-top: 2px solid var(--accent-color) !important;
+}
+
+.drag-over-top {
+    border-top: 2px solid var(--accent-color) !important;
+}
+
+.drag-over-bottom {
+    border-bottom: 2px solid var(--accent-color) !important;
 }
 
 .drag-over-header {
