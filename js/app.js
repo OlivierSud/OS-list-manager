@@ -866,7 +866,7 @@ function startInlineEdit(element, index) {
     element.innerHTML = '';
     element.appendChild(input);
     input.focus();
-    input.select();
+    // Removed input.select() to allow users to click and place the cursor where they want
 }
 
 function goHome() {
@@ -1004,24 +1004,54 @@ function setupDragHandlers(element, index, isHeader) {
 
         if (dragIndex === dropIndex) return;
 
-        // Reorder items
         const listId = state.activeListId;
         const items = [...state.items[listId]];
-        const [movedItem] = items.splice(dragIndex, 1);
+        const movedItem = items[dragIndex];
 
         // If moving a header, move all items in that section
         if (movedItem.isHeader) {
-            const sectionItems = [];
+            // Find all items in the section being moved
+            const sectionToMove = [];
             let i = dragIndex;
+            sectionToMove.push(items[i++]); // The header
             while (i < items.length && !items[i].isHeader) {
-                sectionItems.push(items.splice(dragIndex, 1)[0]);
+                sectionToMove.push(items[i++]);
             }
 
-            // Insert header and section items
-            const insertIndex = dropIndex > dragIndex ? dropIndex - 1 : dropIndex;
-            items.splice(insertIndex, 0, movedItem, ...sectionItems);
+            // Check if drop target is within the section being moved
+            if (dropIndex >= dragIndex && dropIndex < dragIndex + sectionToMove.length) return;
+
+            // Remove the section from its original position
+            items.splice(dragIndex, sectionToMove.length);
+
+            // Calculate new drop index after removal
+            let newDropIndex = dropIndex;
+            if (dropIndex > dragIndex) {
+                newDropIndex -= sectionToMove.length;
+                // If dropped on an item of another section when moving a header,
+                // we move to after that entire section to keep it intact.
+                // find the end of target's section
+                while (newDropIndex + 1 < items.length && !items[newDropIndex + 1].isHeader) {
+                    newDropIndex++;
+                }
+                newDropIndex++; // Go after the last item
+            } else {
+                // If dropping a header before or on an item, put it before the header of that item
+                while (newDropIndex > 0 && !items[newDropIndex].isHeader) {
+                    newDropIndex--;
+                }
+            }
+
+            // Insert at new position
+            items.splice(newDropIndex, 0, ...sectionToMove);
         } else {
-            items.splice(dropIndex > dragIndex ? dropIndex : dropIndex, 0, movedItem);
+            // Moving a single item
+            const [item] = items.splice(dragIndex, 1);
+            let newDropIndex = dropIndex;
+            if (dropIndex > dragIndex) {
+                newDropIndex--;
+            }
+            items.splice(newDropIndex, 0, item);
         }
 
         state.items[listId] = items;
