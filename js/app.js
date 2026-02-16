@@ -237,15 +237,24 @@ async function fetchSheetData() {
                 const items = [];
                 if (data.values) {
                     data.values.forEach((row, rowIndex) => {
-                        if (!row[0]) return;
-
+                        const colC = row[2] || "";
                         const isHeader = row[1] === "HEADER";
+                        let isStandalone = colC.includes("STANDALONE");
+                        let isSubHeader = colC.includes("SUBHEADER");
+
+                        // Extract filter from row 0 if present
+                        if (rowIndex === 0 && colC.includes("FILTER:")) {
+                            const filterPart = colC.split('|').find(p => p.startsWith('FILTER:'));
+                            if (filterPart) savedFilter = filterPart.replace('FILTER:', '');
+                        }
 
                         items.push({
                             id: `${sheetId}-${rowIndex}`,
                             text: row[0],
                             done: row[1] === "TRUE",
                             isHeader: isHeader,
+                            isSubHeader: isSubHeader,
+                            isStandalone: isStandalone,
                             lastModifier: row[3] || "" // Column D
                         });
                     });
@@ -342,9 +351,10 @@ async function toggleItemInSheet(listId, itemId, newStatus) {
     // Deleting rows would break this. For a robust app, we'd need permanent IDs.
     // For this prototype, we'll try to update securely.
 
-    // Extract row index (mock implementation)
+    // Extract row index
     const rowIndex = parseInt(itemId.split('-')[1]);
     const list = state.lists.find(l => l.id === listId);
+    const item = state.items[listId].find(i => i.id === itemId);
 
     // Row index in sheet is 1-based usually for A1 notation, but values array is 0-based.
     // A1 notation: Sheet!B{rowIndex+1}:D{rowIndex+1}
@@ -355,6 +365,18 @@ async function toggleItemInSheet(listId, itemId, newStatus) {
         // Headers have distinct value so toggling true/false would be bad if we lose "HEADER" status
         // But UI prevents clicking headers.
 
+        // Preserve standalone status if present
+        let colCValue = "";
+        if (rowIndex === 0) {
+            // For the first row (C1), preserve FILTER and STANDALONE for the item
+            let filterPart = `FILTER:${list.filter}`;
+            let standalonePart = item.isStandalone ? "|STANDALONE" : "";
+            colCValue = `${filterPart}${standalonePart}`;
+        } else {
+            // For other rows, preserve STANDALONE for the item
+            colCValue = item.isStandalone ? "STANDALONE" : "";
+        }
+
         await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`, {
             method: 'PUT',
             headers: {
@@ -362,10 +384,8 @@ async function toggleItemInSheet(listId, itemId, newStatus) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                // Range B:D, update B (status) and D (email), leave C (config) untouched if possible or empty
-                // Note: updating a range like B:D with empty string in middle might affect C1
-                // For simplicity we use a 1x3 array
-                values: [[newStatus ? "TRUE" : "FALSE", "", state.userEmail || ""]]
+                // Range B:D, update B (status), C (config), and D (email)
+                values: [[newStatus ? "TRUE" : "FALSE", colCValue, state.userEmail || ""]]
             })
         });
 
@@ -737,10 +757,41 @@ function renderList(listId) {
     if (currentItems.length === 0) {
         tasksContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 2rem;">Aucun élément. Ajoutez-en un !</div>`;
     } else {
-        let currentSectionIndex = -1;
+        // Find if there are any headers
+        const hasHeaders = currentItems.some(i => i.isHeader);
+
+        // ALWAYS add a top drop zone to allow moving items out of sections to the top
+        const topDropZone = document.createElement('div');
+        topDropZone.className = 'drop-zone-spacer';
+        topDropZone.dataset.dropTargetIndex = 0;
+        topDropZone.innerText = "Sortir de la section (Haut)";
+        setupBoundaryDragHandlers(topDropZone, 'top');
+        tasksContainer.appendChild(topDropZone);
+
+        let mainSectionIndex = -1;
+        let activeSectionCollapsed = false;
         let sectionCollapsed = false;
 
         currentItems.forEach((item, index) => {
+            // Check if we need to add a spacer BEFORE a header (except for the very first item which has the top spacer)
+            if (item.isHeader && index > 0) {
+                const zone = document.createElement('div');
+                zone.className = 'drop-zone-spacer';
+                zone.dataset.dropTargetIndex = index;
+                zone.innerText = "Sortir de la section";
+                setupBoundaryDragHandlers(zone, 'middle');
+                tasksContainer.appendChild(zone);
+            }
+
+            // Track if we are in a sub-section or main section
+            if (item.isHeader) {
+                if (!item.isSubHeader) {
+                    mainSectionIndex = index;
+                }
+            } else if (item.isStandalone) {
+                mainSectionIndex = -1;
+            }
+
             // Apply filtering logic
             if (!item.isHeader) {
                 // Filter by checkbox status
@@ -756,31 +807,35 @@ function renderList(listId) {
             const el = document.createElement('div');
 
             if (item.isHeader) {
-                currentSectionIndex = index;
+                const isSub = item.isSubHeader;
                 sectionCollapsed = collapsedSections.has(index);
 
-                // Count items in this section (respecting search and filter)
+                // For sub-sections, if the parent main section is collapsed, we don't render
+                if (!isSub) {
+                    // It's a main header
+                    activeSectionCollapsed = sectionCollapsed;
+                } else if (activeSectionCollapsed) {
+                    // Sub-header inside a collapsed main section
+                    return;
+                }
+
+                // Count items in this section
                 let itemCount = 0;
                 for (let i = index + 1; i < currentItems.length; i++) {
                     const subItem = currentItems[i];
-                    if (subItem.isHeader) break;
+                    if (subItem.isHeader && !subItem.isSubHeader) break; // Next main section
+                    if (isSub && subItem.isHeader) break; // Next sub section inside same main
 
                     const matchesSearch = !state.searchQuery || subItem.text.toLowerCase().includes(state.searchQuery.toLowerCase());
                     if (!matchesSearch) continue;
 
-                    if (state.filter === 'all') itemCount++;
-                    else if (state.filter === 'active' && !subItem.done) itemCount++;
-                    else if (state.filter === 'completed' && subItem.done) itemCount++;
-                }
-
-                // If search is active, don't show empty sections if they don't contain matching search items
-                // UNLESS the header itself matches the search
-                const headerMatchesSearch = !state.searchQuery || item.text.toLowerCase().includes(state.searchQuery.toLowerCase());
-                if (state.searchQuery && itemCount === 0 && !headerMatchesSearch) {
-                    return;
+                    if (state.filter === 'all' || (state.filter === 'active' && !subItem.done) || (state.filter === 'completed' && subItem.done)) {
+                        itemCount++;
+                    }
                 }
 
                 el.className = 'list-header';
+                if (isSub) el.classList.add('sub-header');
                 el.draggable = true;
                 el.dataset.index = index;
                 el.dataset.isHeader = 'true';
@@ -811,12 +866,27 @@ function renderList(listId) {
 
                 setupDragHandlers(el, index, true);
             } else {
-                // Hide items if section is collapsed
-                if (sectionCollapsed && currentSectionIndex >= 0) {
-                    return; // Skip rendering
+                // Task Item
+                // Hide if parent main section is collapsed OR its direct sub-section is collapsed
+                if (activeSectionCollapsed) return;
+
+                // Find parent sub-header if any
+                let inSubSection = false;
+                for (let j = index - 1; j >= 0; j--) {
+                    if (currentItems[j].isHeader) {
+                        if (currentItems[j].isSubHeader) {
+                            if (collapsedSections.has(j)) return; // Hidden by sub-header
+                            inSubSection = true;
+                        }
+                        break;
+                    }
                 }
 
                 el.className = 'glass-panel task-item';
+                if (mainSectionIndex >= 0) {
+                    el.classList.add('in-section');
+                    if (inSubSection) el.classList.add('in-sub-section');
+                }
                 if (item.done) el.className += ' done';
                 el.draggable = true;
                 el.dataset.index = index;
@@ -840,6 +910,14 @@ function renderList(listId) {
 
             tasksContainer.appendChild(el);
         });
+
+        // Always add a spacer at the very end
+        const bottomZone = document.createElement('div');
+        bottomZone.className = 'drop-zone-spacer';
+        bottomZone.dataset.dropTargetIndex = currentItems.length;
+        bottomZone.innerText = "Sortir de la section (Bas)";
+        setupBoundaryDragHandlers(bottomZone, 'bottom');
+        tasksContainer.appendChild(bottomZone);
     }
 
     lucide.createIcons();
@@ -1006,14 +1084,17 @@ function setupDragHandlers(element, index, isHeader) {
         draggedElement = element;
         draggedIndex = index;
         element.classList.add('dragging');
+        tasksContainer.classList.add('dragging-active'); // Show all spacers
         e.dataTransfer.effectAllowed = 'move';
     });
 
     element.addEventListener('dragend', (e) => {
         element.classList.remove('dragging');
-        document.querySelectorAll('.drag-over, .drag-over-header').forEach(el => {
+        tasksContainer.classList.remove('dragging-active');
+        document.querySelectorAll('.drag-over, .drag-over-header, .drag-over-boundary').forEach(el => {
             el.classList.remove('drag-over');
             el.classList.remove('drag-over-header');
+            el.classList.remove('drag-over-boundary');
         });
     });
 
@@ -1053,69 +1134,142 @@ function setupDragHandlers(element, index, isHeader) {
 
         // If moving a header, move all items in that section
         if (movedItem.isHeader) {
-            // Find all items in the section being moved
             const sectionToMove = [];
             let i = dragIndex;
-            sectionToMove.push(items[i++]); // The header
+            sectionToMove.push(items[i++]);
             while (i < items.length && !items[i].isHeader) {
                 sectionToMove.push(items[i++]);
             }
 
-            // Check if drop target is within the section being moved
             if (dropIndex >= dragIndex && dropIndex < dragIndex + sectionToMove.length) return;
 
-            // Remove the section from its original position
             items.splice(dragIndex, sectionToMove.length);
 
-            // Calculate new drop index after removal
             let newDropIndex = dropIndex;
             if (dropIndex > dragIndex) {
                 newDropIndex -= sectionToMove.length;
-                // If dropped on an item of another section when moving a header,
-                // we move to after that entire section to keep it intact.
-                while (newDropIndex + 1 < items.length && !items[newDropIndex + 1].isHeader) {
-                    newDropIndex++;
-                }
-                newDropIndex++; // Go after the last item
-            } else {
-                // If dropping a header before or on an item, put it before the header of that item
-                while (newDropIndex > 0 && !items[newDropIndex].isHeader) {
-                    newDropIndex--;
+            }
+
+            // Nesting logic: become SubHeader if dropped into a main section
+            let dropParentMainIndex = -1;
+            // Check elements before the drop point to see if we are inside a main section
+            for (let j = newDropIndex - 1; j >= 0; j--) {
+                if (items[j].isHeader && !items[j].isSubHeader) {
+                    dropParentMainIndex = j;
+                    break;
                 }
             }
 
-            // Insert at new position
+            if (dropParentMainIndex >= 0) {
+                console.log(`Nesting section "${sectionToMove[0].text}" into main section "${items[dropParentMainIndex].text}"`);
+                sectionToMove[0].isSubHeader = true;
+                sectionToMove[0].isStandalone = false;
+            } else {
+                console.log(`Setting section "${sectionToMove[0].text}" as main section`);
+                sectionToMove[0].isSubHeader = false;
+            }
+
             items.splice(newDropIndex, 0, ...sectionToMove);
         } else {
             // Moving a single item
             const [item] = items.splice(dragIndex, 1);
             let targetIndex = dropIndex;
-
-            // Adjust index if moving down
             if (dropIndex > dragIndex) targetIndex--;
 
-            // Special Logic: If moving to very top or very bottom, it stays out of any section
-            if (targetIndex === 0) {
-                // Drop at the very beginning (above any section)
+            const dropOnHeader = element.dataset.isHeader === 'true';
+            console.log(`Dropping item on ${dropOnHeader ? 'header' : 'item'} at index ${targetIndex}`);
+
+            if (dropOnHeader) {
+                item.isStandalone = false;
+                item.isSubHeader = false;
+                console.log(`- Item entering section at index ${targetIndex + 1}`);
+                items.splice(targetIndex + 1, 0, item);
+            } else if (targetIndex === 0) {
+                item.isStandalone = true;
+                item.isSubHeader = false;
+                console.log(`- Item becoming standalone at top`);
                 items.splice(0, 0, item);
             } else if (targetIndex >= items.length) {
-                // Drop at the very end
+                item.isStandalone = true;
+                item.isSubHeader = false;
+                console.log(`- Item becoming standalone at bottom`);
                 items.push(item);
             } else {
-                const dropOnHeader = element.dataset.isHeader === 'true';
-                if (dropOnHeader) {
-                    // If drop on a header, place it as the first item of that section
-                    items.splice(targetIndex + 1, 0, item);
-                } else {
-                    items.splice(targetIndex, 0, item);
+                const targetItem = items[targetIndex];
+                if (targetItem) {
+                    item.isStandalone = targetItem.isStandalone;
                 }
+                items.splice(targetIndex, 0, item);
             }
         }
 
         state.items[listId] = items;
         renderList(listId);
+        syncOrderToSheet(listId);
+    });
+}
 
-        // Sync to Google Sheets
+function setupBoundaryDragHandlers(element, position) {
+    if (!element) return;
+
+    element.addEventListener('dragover', (e) => {
+        if (!draggedElement) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        element.classList.add('drag-over-boundary');
+    });
+
+    element.addEventListener('dragleave', () => {
+        element.classList.remove('drag-over-boundary');
+    });
+
+    element.addEventListener('drop', (e) => {
+        if (!draggedElement) return;
+        e.preventDefault();
+        element.classList.remove('drag-over-boundary');
+
+        const listId = state.activeListId;
+        const dragIndex = draggedIndex;
+        const items = [...state.items[listId]];
+
+        // Handle moving entire section OR single item
+        const isHeaderMove = draggedElement.dataset.isHeader === 'true';
+        let itemsToMove = [];
+
+        if (isHeaderMove) {
+            let i = dragIndex;
+            itemsToMove.push(items[i++]);
+            while (i < items.length && !items[i].isHeader) {
+                itemsToMove.push(items[i++]);
+            }
+            items.splice(dragIndex, itemsToMove.length);
+            itemsToMove[0].isSubHeader = false; // Reset nesting when dropped in a spacer
+            itemsToMove[0].isStandalone = false; // Headers are never technically "standalone" in the same way items are
+        } else {
+            const [item] = items.splice(dragIndex, 1);
+            item.isStandalone = true;
+            item.isSubHeader = false;
+            itemsToMove = [item];
+        }
+
+        const targetIndexAttr = element.dataset.dropTargetIndex;
+        let targetIndex = targetIndexAttr !== undefined ? parseInt(targetIndexAttr) : items.length;
+        console.log(`Dropping ${isHeaderMove ? 'section' : 'item'} onto spacer at index ${targetIndex}`);
+
+        // Adjust for removal
+        if (isHeaderMove) {
+            if (dragIndex < targetIndex) {
+                targetIndex -= itemsToMove.length;
+            }
+        } else {
+            if (dragIndex < targetIndex) targetIndex--;
+        }
+
+        console.log(`- Final target position: ${targetIndex}`);
+        items.splice(targetIndex, 0, ...itemsToMove);
+
+        state.items[listId] = items;
+        renderList(listId);
         syncOrderToSheet(listId);
     });
 }
@@ -1127,12 +1281,22 @@ async function syncOrderToSheet(listId) {
     if (!list) return;
 
     const items = state.items[listId];
-    const values = items.map(item => [
-        item.text,
-        item.isHeader ? 'HEADER' : (item.done ? 'TRUE' : 'FALSE'),
-        "", // Column C
-        item.lastModifier || "" // Column D
-    ]);
+    const values = items.map((item, idx) => {
+        let meta = [];
+        if (item.isStandalone) meta.push("STANDALONE");
+        if (item.isSubHeader) meta.push("SUBHEADER");
+
+        let colC = meta.join("|");
+        if (idx === 0) {
+            colC = `FILTER:${list.filter}${colC ? "|" + colC : ""}`;
+        }
+        return [
+            item.text,
+            item.isHeader ? 'HEADER' : (item.done ? 'TRUE' : 'FALSE'),
+            colC,
+            item.lastModifier || ""
+        ];
+    });
 
     try {
         // Clear and rewrite the entire sheet A:D
