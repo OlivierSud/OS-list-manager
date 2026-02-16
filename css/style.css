@@ -52,8 +52,7 @@ body {
     width: 100%;
     max-width: 600px;
     padding: 1rem;
-    padding-bottom: 80px;
-    /* Space for fixed input bar/FAB */
+    padding-bottom: calc(120px + env(safe-area-inset-bottom));
     box-sizing: border-box;
     position: relative;
     overflow-x: hidden;
@@ -358,7 +357,7 @@ h1 {
 /* Floating Action Button */
 .fab {
     position: fixed;
-    bottom: 2rem;
+    bottom: calc(2rem + env(safe-area-inset-bottom));
     right: 2rem;
     width: 64px;
     height: 64px;
@@ -383,7 +382,7 @@ h1 {
 /* Input Bar */
 .input-bar {
     position: fixed;
-    bottom: 1.5rem;
+    bottom: calc(1.5rem + env(safe-area-inset-bottom));
     left: 1rem;
     right: 1rem;
     display: flex;

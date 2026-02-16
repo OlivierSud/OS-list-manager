@@ -839,11 +839,18 @@ function deleteListItem(index) {
 }
 
 function startInlineEdit(element, index) {
+    // Prevent re-triggering if already editing
+    if (element.querySelector('input')) return;
+
     const originalText = element.innerText;
     const input = document.createElement('input');
     input.type = 'text';
     input.value = originalText;
     input.className = 'inline-edit-input';
+
+    // Stop propagation of clicks on the input so they don't trigger the parent span's onclick
+    input.onclick = (e) => e.stopPropagation();
+    input.onmousedown = (e) => e.stopPropagation();
 
     // Save function
     const save = () => {
