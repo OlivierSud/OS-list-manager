@@ -97,6 +97,11 @@ function installPWAFromBanner() {
 let listFilters = {};
 
 
+// --- Utilities ---
+function generateId() {
+    return Math.random().toString(36).substring(2, 9);
+}
+
 // --- Google Sheets & Auth Integration ---
 // TODO: User must replace this with their own OAuth 2.0 Client ID from Google Cloud Console
 const CLIENT_ID = '356152485310-ofia0pr8hcig7s906tfu1c9v1us7s4gb.apps.googleusercontent.com';
@@ -236,26 +241,49 @@ async function fetchSheetData() {
 
                 const items = [];
                 if (data.values) {
+                    let lastHeaderUid = null;
                     data.values.forEach((row, rowIndex) => {
                         const colC = row[2] || "";
                         const isHeader = row[1] === "HEADER";
-                        let isStandalone = colC.includes("STANDALONE");
-                        let isSubHeader = colC.includes("SUBHEADER");
 
-                        // Extract filter from row 0 if present
-                        if (rowIndex === 0 && colC.includes("FILTER:")) {
-                            const filterPart = colC.split('|').find(p => p.startsWith('FILTER:'));
-                            if (filterPart) savedFilter = filterPart.replace('FILTER:', '');
+                        // Parse Column C Metadata
+                        const parts = colC.split('|');
+                        let uid = parts.find(p => p.startsWith('UID:'))?.replace('UID:', '');
+                        let pid = parts.find(p => p.startsWith('PID:'))?.replace('PID:', '');
+                        let color = parts.find(p => p.startsWith('COLOR:'))?.replace('COLOR:', '');
+                        let isStandalone = parts.includes('STANDALONE');
+                        const isSubHeader = parts.includes('SUBHEADER');
+
+                        // Backward compatibility and inference
+                        if (isHeader) {
+                            if (!uid) uid = generateId();
+                            lastHeaderUid = uid;
+                        } else {
+                            // It's a task. If it has no PID and is not explicitly standalone, 
+                            // it likely belongs to the preceding header.
+                            if (!pid && !isStandalone) {
+                                pid = lastHeaderUid;
+                            }
+                            // Still no pid? Then it's standalone (top of the list)
+                            if (!pid) isStandalone = true;
+                        }
+
+                        // Extract filter from row 0 if present (FILTER: All|Active|Completed)
+                        const filterPart = parts.find(p => p.startsWith('FILTER:'));
+                        if (rowIndex === 0 && filterPart) {
+                            savedFilter = filterPart.replace('FILTER:', '');
                         }
 
                         items.push({
-                            id: `${sheetId}-${rowIndex}`,
+                            id: uid || `${sheetId}-${rowIndex}-${generateId()}`,
                             text: row[0],
                             done: row[1] === "TRUE",
                             isHeader: isHeader,
                             isSubHeader: isSubHeader,
                             isStandalone: isStandalone,
-                            lastModifier: row[3] || "" // Column D
+                            parentId: isStandalone ? null : pid,
+                            color: color || null,
+                            lastModifier: row[3] || ""
                         });
                     });
                 }
@@ -574,6 +602,8 @@ function getRandomColor(index) {
     return COLOR_PALETTE[index % COLOR_PALETTE.length];
 }
 
+let colorTarget = { type: 'list', id: null }; // 'list' or 'section'
+
 function initColorPicker() {
     colorGrid.innerHTML = '';
     COLOR_PALETTE.forEach(color => {
@@ -590,7 +620,11 @@ function initColorPicker() {
         colorBtn.onmouseover = () => colorBtn.style.transform = 'scale(1.1)';
         colorBtn.onmouseout = () => colorBtn.style.transform = 'scale(1)';
         colorBtn.onclick = () => {
-            updateSheetColor(currentListId, color);
+            if (colorTarget.type === 'list') {
+                updateSheetColor(colorTarget.id, color);
+            } else {
+                updateSectionColor(colorTarget.index, color);
+            }
             closeColorModal();
             closeOptions();
         };
@@ -599,8 +633,9 @@ function initColorPicker() {
 }
 
 function openColorModal() {
-    initColorPicker();
-    colorModal.style.display = 'flex';
+    if (!colorTarget || colorTarget.type === 'list') {
+        colorTarget = { type: 'list', id: currentListId };
+    }
     colorModal.classList.remove('hidden');
 }
 
@@ -768,13 +803,14 @@ function renderList(listId) {
         setupBoundaryDragHandlers(topDropZone, 'top');
         tasksContainer.appendChild(topDropZone);
 
-        let mainSectionIndex = -1;
+        let mainSectionId = null;
         let activeSectionCollapsed = false;
         let sectionCollapsed = false;
 
         currentItems.forEach((item, index) => {
-            // Check if we need to add a spacer BEFORE a header (except for the very first item which has the top spacer)
-            if (item.isHeader && index > 0) {
+            // Check if we need to add a spacer BEFORE a main header (to allow exiting sections)
+            // No spacer before a sub-header to prevent root items between a section and its sub-section
+            if (item.isHeader && !item.isSubHeader && index > 0) {
                 const zone = document.createElement('div');
                 zone.className = 'drop-zone-spacer';
                 zone.dataset.dropTargetIndex = index;
@@ -783,13 +819,9 @@ function renderList(listId) {
                 tasksContainer.appendChild(zone);
             }
 
-            // Track if we are in a sub-section or main section
-            if (item.isHeader) {
-                if (!item.isSubHeader) {
-                    mainSectionIndex = index;
-                }
-            } else if (item.isStandalone) {
-                mainSectionIndex = -1;
+            // Track Section Context
+            if (item.isHeader && !item.isSubHeader) {
+                mainSectionId = item.id;
             }
 
             // Apply filtering logic
@@ -810,22 +842,33 @@ function renderList(listId) {
                 const isSub = item.isSubHeader;
                 sectionCollapsed = collapsedSections.has(index);
 
-                // For sub-sections, if the parent main section is collapsed, we don't render
-                if (!isSub) {
-                    // It's a main header
-                    activeSectionCollapsed = sectionCollapsed;
-                } else if (activeSectionCollapsed) {
-                    // Sub-header inside a collapsed main section
-                    return;
+                // Check if ANY parent section is collapsed
+                if (item.parentId) {
+                    let currentPid = item.parentId;
+                    while (currentPid) {
+                        const ancestor = currentItems.find(i => i.isHeader && i.id === currentPid);
+                        if (!ancestor) break;
+                        if (collapsedSections.has(currentItems.indexOf(ancestor))) return; // Hidden by ancestor collapse
+                        currentPid = ancestor.parentId;
+                    }
                 }
 
-                // Count items in this section
+                // Position-based counting: count everything until the next section of same or higher level
                 let itemCount = 0;
                 for (let i = index + 1; i < currentItems.length; i++) {
                     const subItem = currentItems[i];
-                    if (subItem.isHeader && !subItem.isSubHeader) break; // Next main section
-                    if (isSub && subItem.isHeader) break; // Next sub section inside same main
 
+                    // Boundary check:
+                    if (subItem.isHeader) {
+                        // If we are a main section, we stop only at another MAIN section (sub-sections are part of us)
+                        if (!isSub && subItem.isSubHeader) {
+                            continue;
+                        }
+                        // If we are a sub-section, we stop at ANY header (another sub or a new main)
+                        break;
+                    }
+
+                    // Content check (Search & Filter)
                     const matchesSearch = !state.searchQuery || subItem.text.toLowerCase().includes(state.searchQuery.toLowerCase());
                     if (!matchesSearch) continue;
 
@@ -834,6 +877,7 @@ function renderList(listId) {
                     }
                 }
 
+
                 el.className = 'list-header';
                 if (isSub) el.classList.add('sub-header');
                 el.draggable = true;
@@ -841,18 +885,32 @@ function renderList(listId) {
                 el.dataset.isHeader = 'true';
 
                 const arrowClass = sectionCollapsed ? 'collapsed' : '';
+
+                // Effective color: item color OR parent color if null
+                let effectiveColor = item.color;
+                if (!effectiveColor && item.parentId) {
+                    const parentHeader = currentItems.find(i => i.isHeader && i.id === item.parentId);
+                    if (parentHeader) effectiveColor = parentHeader.color;
+                }
+
+                const bulletColor = effectiveColor || '#555';
+                const colorBullet = `<span class="section-bullet" style="background: ${bulletColor};" onclick="event.stopPropagation(); colorTarget={type:'section', index:${index}}; openColorModal();"></span>`;
+
                 el.innerHTML = `
                     <div style="display: flex; align-items: center; flex: 1;">
                         <span class="drag-handle"><i data-lucide="grip-vertical" style="width: 16px; height: 16px;"></i></span>
                         <span class="collapse-arrow ${arrowClass}" data-section-index="${index}">
                             <i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i>
                         </span>
+                        ${colorBullet}
                         <span class="item-text" onclick="event.stopPropagation(); startInlineEdit(this, ${index})">${item.text}</span>
                         <span style="margin-left: 0.5rem; font-size: 0.75rem; opacity: 0.5; font-weight: 400;">(${itemCount})</span>
                     </div>
-                    <button class="btn-delete-item" onclick="event.stopPropagation(); deleteListItem(${index})">
-                        <i data-lucide="x" style="width: 14px; height: 14px;"></i>
-                    </button>
+                    <div style="display: flex; gap: 0.25rem;">
+                        <button class="btn-icon-small" onclick="event.stopPropagation(); openSectionOptions(${index})">
+                            <i data-lucide="more-vertical" style="width: 14px; height: 14px;"></i>
+                        </button>
+                    </div>
                 `;
 
                 // Add collapse event listener
@@ -867,25 +925,43 @@ function renderList(listId) {
                 setupDragHandlers(el, index, true);
             } else {
                 // Task Item
-                // Hide if parent main section is collapsed OR its direct sub-section is collapsed
-                if (activeSectionCollapsed) return;
-
-                // Find parent sub-header if any
-                let inSubSection = false;
-                for (let j = index - 1; j >= 0; j--) {
-                    if (currentItems[j].isHeader) {
-                        if (currentItems[j].isSubHeader) {
-                            if (collapsedSections.has(j)) return; // Hidden by sub-header
-                            inSubSection = true;
-                        }
-                        break;
+                // Check if hidden by ANY parent collapse
+                if (item.parentId) {
+                    let currentPid = item.parentId;
+                    while (currentPid) {
+                        const ancestor = currentItems.find(i => i.isHeader && i.id === currentPid);
+                        if (!ancestor) break;
+                        if (collapsedSections.has(currentItems.indexOf(ancestor))) return; // Hidden by ancestor
+                        currentPid = ancestor.parentId;
                     }
                 }
 
                 el.className = 'glass-panel task-item';
-                if (mainSectionIndex >= 0) {
+                let parentColor = null;
+                if (item.parentId) {
                     el.classList.add('in-section');
-                    if (inSubSection) el.classList.add('in-sub-section');
+                    // Check if parent header is a sub-header
+                    const parentHeader = currentItems.find(i => i.isHeader && i.id === item.parentId);
+                    if (parentHeader) {
+                        if (parentHeader.isSubHeader) el.classList.add('in-sub-section');
+                        if (parentHeader.color) parentColor = parentHeader.color;
+                    }
+                }
+
+                // Apply tint if parent or ancestor has color
+                if (parentColor) {
+                    el.style.backgroundColor = `${parentColor}10`; // 0x10 is ~6% opacity
+                    el.style.borderLeftColor = parentColor;
+                } else if (item.parentId) {
+                    // Check grandparent color if parent is a subheader without color
+                    const parentHeader = currentItems.find(i => i.isHeader && i.id === item.parentId);
+                    if (parentHeader && parentHeader.parentId) {
+                        const grandParent = currentItems.find(i => i.isHeader && i.id === parentHeader.parentId);
+                        if (grandParent && grandParent.color) {
+                            el.style.backgroundColor = `${grandParent.color}10`;
+                            el.style.borderLeftColor = grandParent.color;
+                        }
+                    }
                 }
                 if (item.done) el.className += ' done';
                 el.draggable = true;
@@ -1014,11 +1090,31 @@ function addItem() {
     const isHeader = state.isHeaderMode;
 
     // Create new item locally
+    // Infer parentId based on previous items if we are adding a task
+    let inferredPid = null;
+    let isStandalone = true;
+    if (!isHeader) {
+        // Look for the last header encountered in the existing list
+        const items = state.items[listId] || [];
+        if (items.length > 0) {
+            // Find the header that currently "owns" the end of the list
+            for (let i = items.length - 1; i >= 0; i--) {
+                if (items[i].isHeader) {
+                    inferredPid = items[i].id;
+                    isStandalone = false;
+                    break;
+                }
+            }
+        }
+    }
+
     const newItem = {
         id: `${listId}-${Date.now()}`, // Temporary ID
         text: text,
         done: false,
-        isHeader: isHeader
+        isHeader: isHeader,
+        isStandalone: isStandalone,
+        parentId: inferredPid
     };
 
     if (!state.items[listId]) state.items[listId] = [];
@@ -1077,6 +1173,54 @@ function toggleSection(sectionIndex) {
         collapsedSections.add(sectionIndex);
     }
     renderList(state.activeListId);
+}
+
+function openSectionOptions(index) {
+    const item = state.items[state.activeListId][index];
+    currentListId = state.activeListId;
+
+    modalTitle.innerText = item.text;
+    modalDesc.innerText = "Options pour la section";
+
+    // Customize modal for section
+    btnRename.onclick = () => {
+        const newName = prompt("Nouveau nom :", item.text);
+        if (newName && newName !== item.text) {
+            item.text = newName;
+            renderList(state.activeListId);
+            syncOrderToSheet(state.activeListId);
+        }
+        closeOptions();
+    };
+
+    btnColor.onclick = () => {
+        colorTarget = { type: 'section', index: index };
+        openColorModal();
+    };
+
+    btnDelete.onclick = () => {
+        if (confirm("Supprimer cette section et tout son contenu ?")) {
+            deleteListItem(index);
+            closeOptions();
+        }
+    };
+
+    // Hide duplicate for section
+    btnDuplicate.classList.add('hidden');
+    btnLogout.classList.add('hidden');
+
+    modal.style.display = 'flex';
+    modal.classList.remove('hidden');
+}
+
+function updateSectionColor(index, color) {
+    const listId = state.activeListId;
+    const item = state.items[listId][index];
+    if (item) {
+        item.color = color;
+        renderList(listId);
+        syncOrderToSheet(listId);
+    }
 }
 
 function setupDragHandlers(element, index, isHeader) {
@@ -1151,23 +1295,29 @@ function setupDragHandlers(element, index, isHeader) {
             }
 
             // Nesting logic: become SubHeader if dropped into a main section
-            let dropParentMainIndex = -1;
-            // Check elements before the drop point to see if we are inside a main section
+            let dropParentMain = null;
             for (let j = newDropIndex - 1; j >= 0; j--) {
                 if (items[j].isHeader && !items[j].isSubHeader) {
-                    dropParentMainIndex = j;
+                    dropParentMain = items[j];
                     break;
                 }
             }
 
-            if (dropParentMainIndex >= 0) {
-                console.log(`Nesting section "${sectionToMove[0].text}" into main section "${items[dropParentMainIndex].text}"`);
+            if (dropParentMain) {
+                console.log(`Nesting section "${sectionToMove[0].text}" into main section "${dropParentMain.text}"`);
                 sectionToMove[0].isSubHeader = true;
                 sectionToMove[0].isStandalone = false;
+                sectionToMove[0].parentId = dropParentMain.id;
             } else {
                 console.log(`Setting section "${sectionToMove[0].text}" as main section`);
                 sectionToMove[0].isSubHeader = false;
+                sectionToMove[0].parentId = null;
             }
+
+            // Update parentId for all items in the moved section to stay with this header
+            sectionToMove.forEach(it => {
+                if (!it.isHeader) it.parentId = sectionToMove[0].id;
+            });
 
             items.splice(newDropIndex, 0, ...sectionToMove);
         } else {
@@ -1177,27 +1327,26 @@ function setupDragHandlers(element, index, isHeader) {
             if (dropIndex > dragIndex) targetIndex--;
 
             const dropOnHeader = element.dataset.isHeader === 'true';
-            console.log(`Dropping item on ${dropOnHeader ? 'header' : 'item'} at index ${targetIndex}`);
 
             if (dropOnHeader) {
+                const targetHeader = items[targetIndex];
                 item.isStandalone = false;
                 item.isSubHeader = false;
-                console.log(`- Item entering section at index ${targetIndex + 1}`);
+                item.parentId = targetHeader.id;
                 items.splice(targetIndex + 1, 0, item);
             } else if (targetIndex === 0) {
                 item.isStandalone = true;
-                item.isSubHeader = false;
-                console.log(`- Item becoming standalone at top`);
+                item.parentId = null;
                 items.splice(0, 0, item);
             } else if (targetIndex >= items.length) {
                 item.isStandalone = true;
-                item.isSubHeader = false;
-                console.log(`- Item becoming standalone at bottom`);
+                item.parentId = null;
                 items.push(item);
             } else {
                 const targetItem = items[targetIndex];
                 if (targetItem) {
                     item.isStandalone = targetItem.isStandalone;
+                    item.parentId = targetItem.parentId;
                 }
                 items.splice(targetIndex, 0, item);
             }
@@ -1243,11 +1392,13 @@ function setupBoundaryDragHandlers(element, position) {
                 itemsToMove.push(items[i++]);
             }
             items.splice(dragIndex, itemsToMove.length);
-            itemsToMove[0].isSubHeader = false; // Reset nesting when dropped in a spacer
-            itemsToMove[0].isStandalone = false; // Headers are never technically "standalone" in the same way items are
+            itemsToMove[0].isSubHeader = false;
+            itemsToMove[0].isStandalone = false;
+            itemsToMove[0].parentId = null;
         } else {
             const [item] = items.splice(dragIndex, 1);
             item.isStandalone = true;
+            item.parentId = null;
             item.isSubHeader = false;
             itemsToMove = [item];
         }
@@ -1285,6 +1436,9 @@ async function syncOrderToSheet(listId) {
         let meta = [];
         if (item.isStandalone) meta.push("STANDALONE");
         if (item.isSubHeader) meta.push("SUBHEADER");
+        if (item.isHeader && item.id) meta.push(`UID:${item.id}`);
+        if (item.parentId) meta.push(`PID:${item.parentId}`);
+        if (item.color) meta.push(`COLOR:${item.color}`);
 
         let colC = meta.join("|");
         if (idx === 0) {

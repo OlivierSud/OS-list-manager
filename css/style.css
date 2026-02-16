@@ -232,6 +232,42 @@ h1 {
     transform: translateY(1px);
 }
 
+.btn-icon-small {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.btn-icon-small:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+.section-bullet {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 0.75rem;
+    flex-shrink: 0;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.section-bullet:hover {
+    transform: scale(1.2);
+    filter: brightness(1.2);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
+}
+
 /* List Styles */
 .list-item {
     padding: 1.25rem;
