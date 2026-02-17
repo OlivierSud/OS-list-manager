@@ -1938,4 +1938,50 @@ window.onload = function () {
             renderList(s.id);
         }
     });
+
+    // Touch support: detect touch-based drags on mobile and trigger auto-scroll
+    let touchDragging = false;
+    document.addEventListener('touchstart', (e) => {
+        try {
+            const targetHandle = e.target.closest && e.target.closest('.drag-handle');
+            if (targetHandle) {
+                const el = targetHandle.closest && targetHandle.closest('[draggable]');
+                if (el) {
+                    draggedElement = el;
+                    draggedIndex = parseInt(el.dataset.index);
+                    touchDragging = true;
+                    el.classList.add('dragging');
+                    if (tasksContainer) tasksContainer.classList.add('dragging-active');
+                }
+            }
+        } catch (err) {}
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+        if (!touchDragging) return;
+        if (!e.touches || !e.touches[0]) return;
+        const touch = e.touches[0];
+        // synthesize a minimal event for auto-scroll handler
+        handleAutoScrollDuringDrag({ clientY: touch.clientY });
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+        if (!touchDragging) return;
+        touchDragging = false;
+        stopAutoScroll();
+        if (draggedElement) draggedElement.classList.remove('dragging');
+        if (tasksContainer) tasksContainer.classList.remove('dragging-active');
+        draggedElement = null;
+        draggedIndex = null;
+    });
+
+    document.addEventListener('touchcancel', () => {
+        if (!touchDragging) return;
+        touchDragging = false;
+        stopAutoScroll();
+        if (draggedElement) draggedElement.classList.remove('dragging');
+        if (tasksContainer) tasksContainer.classList.remove('dragging-active');
+        draggedElement = null;
+        draggedIndex = null;
+    });
 };
