@@ -1081,7 +1081,7 @@ function renderList(listId) {
                 const colorBullet = `<span class="section-bullet" style="background: ${bulletColor};" onclick="event.stopPropagation(); window.openSectionColor(${index});"></span>`;
 
                 el.innerHTML = `
-                    <div style="display: flex; align-items: center; flex: 1;" onclick="event.stopPropagation(); toggleSection(${index})">
+                    <div style="display: flex; align-items: center; flex: 1;">
                             <span class="drag-handle" onclick="event.stopPropagation();"><i data-lucide="grip-vertical" style="width: 16px; height: 16px;"></i></span>
                             <span class="collapse-arrow ${arrowClass}" data-section-index="${index}">
                                 <i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i>
@@ -1097,7 +1097,7 @@ function renderList(listId) {
                     </div>
                 `;
 
-                // Add collapse event listener
+                // Add collapse/toggle event listeners
                 const arrow = el.querySelector('.collapse-arrow');
                 if (arrow) {
                     arrow.onclick = (e) => {
@@ -1105,6 +1105,22 @@ function renderList(listId) {
                         toggleSection(index);
                     };
                 }
+
+                // Make the entire header row toggle the section on click,
+                // but ignore clicks that originate from the drag-handle, inline text edit, or buttons.
+                try {
+                    const headerRow = el.querySelector(':scope > div');
+                    if (headerRow) {
+                        headerRow.addEventListener('click', (e) => {
+                            // Ignore clicks on interactive controls
+                            if (e.target.closest('.item-text') || e.target.closest('.drag-handle') || e.target.closest('button') || e.target.closest('.collapse-arrow')) return;
+                            // If a drag is in progress, do not toggle
+                            if (touchDragging || draggedElement) return;
+                            e.stopPropagation();
+                            toggleSection(index);
+                        });
+                    }
+                } catch (e) {}
 
                 setupDragHandlers(el, index, true);
             } else {
