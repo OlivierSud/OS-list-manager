@@ -1997,58 +1997,32 @@ window.onload = function () {
     let touchStartX = 0, touchStartY = 0;
     let touchLastX = 0, touchLastY = 0;
     const LONG_PRESS_MS = 280;
-    // Enable runtime touch debug overlay
-    window.DEBUG_TOUCH = true;
-    let debugOverlay = null;
 
-    function ensureDebugOverlay() {
-        if (!window.DEBUG_TOUCH) return;
-        if (debugOverlay) return;
+    // Simple toast helper to show short messages on the device when console isn't available
+    function showToast(msg, duration = 2000) {
         try {
-            const d = document.createElement('div');
-            d.id = 'touch-debug-overlay';
-            d.style.position = 'fixed';
-            d.style.bottom = '12px';
-            d.style.left = '12px';
-            d.style.zIndex = 999999;
-            d.style.background = 'rgba(0,0,0,0.7)';
-            d.style.color = 'white';
-            d.style.padding = '8px';
-            d.style.fontSize = '12px';
-            d.style.borderRadius = '6px';
-            d.style.maxWidth = '320px';
-            d.style.maxHeight = '200px';
-            d.style.overflow = 'auto';
-            d.style.fontFamily = 'monospace';
-            d.innerHTML = '<pre id="touch-debug-pre" style="margin:0; white-space:pre-wrap; word-break:break-word;"></pre>';
-            document.body.appendChild(d);
-            debugOverlay = d;
-        } catch (e) { console.error('Failed to create debug overlay', e); }
+            // remove existing
+            const existing = document.getElementById('app-toast');
+            if (existing) existing.remove();
+            const t = document.createElement('div');
+            t.id = 'app-toast';
+            t.innerText = msg;
+            t.style.position = 'fixed';
+            t.style.left = '50%';
+            t.style.bottom = '80px';
+            t.style.transform = 'translateX(-50%)';
+            t.style.background = 'rgba(0,0,0,0.8)';
+            t.style.color = 'white';
+            t.style.padding = '8px 12px';
+            t.style.borderRadius = '8px';
+            t.style.zIndex = 999999;
+            t.style.fontSize = '14px';
+            t.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
+            document.body.appendChild(t);
+            setTimeout(() => { try { t.remove(); } catch (e) {} }, duration);
+        } catch (e) { /* ignore */ }
     }
-
-    function updateDebugOverlay(obj) {
-        if (!window.DEBUG_TOUCH) return;
-        ensureDebugOverlay();
-        if (!debugOverlay) return;
-        try {
-            const p = debugOverlay.querySelector('#touch-debug-pre');
-            const now = new Date().toISOString().slice(11,23);
-            const lines = [`[${now}] ${obj.event || ''}`];
-            if (obj.x !== undefined && obj.y !== undefined) lines.push(`coords: ${Math.round(obj.x)},${Math.round(obj.y)}`);
-            if (obj.dragging !== undefined) lines.push(`dragging: ${obj.dragging}`);
-            if (obj.dragIndex !== undefined) lines.push(`dragIndex: ${obj.dragIndex}`);
-            if (obj.drop) lines.push(`drop: ${JSON.stringify(obj.drop)}`);
-            if (obj.msg) lines.push(`msg: ${obj.msg}`);
-            // Prepend to show latest at top
-            p.innerText = lines.join('\n') + '\n\n' + p.innerText;
-        } catch (e) { console.error('Failed to update debug overlay', e); }
-    }
-
-    function clearDebugOverlay() {
-        if (!debugOverlay) return;
-        try { debugOverlay.parentNode.removeChild(debugOverlay); } catch (e) {}
-        debugOverlay = null;
-    }
+    
     let touchGhost = null; // visual floating clone while dragging on touch
 
     function beginDragFromTarget(target) {
@@ -2063,7 +2037,7 @@ window.onload = function () {
             try { if (tasksContainer) tasksContainer.style.touchAction = 'none'; document.body.style.overflow = 'hidden'; } catch (err) {}
             // create floating ghost to follow finger for better UX on mobile
             try { createTouchGhost(el, touchStartX, touchStartY); } catch (e) {}
-            updateDebugOverlay({ event: 'beginDrag', x: touchStartX, y: touchStartY, dragging: true, dragIndex: draggedIndex });
+            
         } catch (err) {}
     }
 
@@ -2175,8 +2149,9 @@ window.onload = function () {
             if (listId === null || listId === undefined) return;
             currentTouchDrop = { type: 'spacer', index: (state.items[listId] || []).length, element: null };
         }
-
-        updateDebugOverlay({ event: 'performDrop', x: touchLastX, y: touchLastY, dragIndex: draggedIndex, drop: currentTouchDrop });
+        
+        try { console.log('performTouchDrop resolved target', currentTouchDrop, 'draggedIndex=', draggedIndex); } catch (e) {}
+        try { showToast(`Cible: ${currentTouchDrop.type} @ ${currentTouchDrop.index}`); } catch (e) {}
         const listId = state.activeListId;
         if (listId === null || listId === undefined) return;
         const items = [...state.items[listId]];
@@ -2263,6 +2238,8 @@ window.onload = function () {
         }
 
         state.items[listId] = items;
+        try { console.log('performTouchDrop after move, new order:', items.map(i => i.text)); } catch (e) {}
+        try { showToast('Relâché — mise à jour appliquée', 1600); } catch (e) {}
         clearTouchIndicator();
         renderList(listId);
         syncOrderToSheet(listId);
@@ -2275,7 +2252,6 @@ window.onload = function () {
         const target = e.target;
         // Use non-passive so we can prevent default on move while dragging
         touchLongPressTimer = setTimeout(() => beginDragFromTarget(target), LONG_PRESS_MS);
-        updateDebugOverlay({ event: 'touchstart', x: touchStartX, y: touchStartY, msg: 'started long-press timer' });
     }, { passive: false });
 
     document.addEventListener('touchmove', (e) => {
@@ -2302,7 +2278,7 @@ window.onload = function () {
         try { moveTouchGhost(touch.clientX, touch.clientY); } catch (err) {}
         const info = findDropAtPoint(touch.clientX, touch.clientY);
         showTouchIndicator(info);
-        updateDebugOverlay({ event: 'touchmove', x: touch.clientX, y: touch.clientY, dragging: touchDragging, drop: info });
+        
     }, { passive: false });
 
     function endTouchDrag() {
@@ -2316,7 +2292,7 @@ window.onload = function () {
         try { clearTouchGhost(); } catch (e) {}
         draggedElement = null;
         draggedIndex = null;
-        updateDebugOverlay({ event: 'endDrag', msg: 'drag ended' });
+        
     }
 
     document.addEventListener('touchend', async (e) => { await performTouchDrop(); endTouchDrag(); }, { passive: false });
@@ -2332,7 +2308,6 @@ window.onload = function () {
             pointerStartX = e.clientX; pointerStartY = e.clientY;
             const target = e.target;
             pointerLongPressTimer = setTimeout(() => beginDragFromTarget(target), LONG_PRESS_MS);
-            updateDebugOverlay({ event: 'pointerdown', x: e.clientX, y: e.clientY });
         }, { passive: false });
 
         document.addEventListener('pointermove', (e) => {
@@ -2345,12 +2320,11 @@ window.onload = function () {
             handleAutoScrollDuringDrag(e);
             try { moveTouchGhost(e.clientX, e.clientY); } catch (err) {}
             touchLastX = e.clientX; touchLastY = e.clientY;
-            updateDebugOverlay({ event: 'pointermove', x: e.clientX, y: e.clientY, dragging: touchDragging });
         }, { passive: false });
 
         document.addEventListener('pointerup', (e) => {
             if (pointerLongPressTimer) { clearTimeout(pointerLongPressTimer); pointerLongPressTimer = null; }
-                (async () => { updateDebugOverlay({ event: 'pointerup', x: e.clientX, y: e.clientY }); await performTouchDrop(); endTouchDrag(); })();
+                (async () => { await performTouchDrop(); endTouchDrag(); })();
         });
     }
 };
