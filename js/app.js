@@ -1968,6 +1968,7 @@ window.onload = function () {
     let touchLongPressTimer = null;
     let touchStartX = 0, touchStartY = 0;
     const LONG_PRESS_MS = 280;
+    let touchGhost = null; // visual floating clone while dragging on touch
 
     function beginDragFromTarget(target) {
         try {
@@ -1979,7 +1980,45 @@ window.onload = function () {
             el.classList.add('dragging');
             if (tasksContainer) tasksContainer.classList.add('dragging-active');
             try { if (tasksContainer) tasksContainer.style.touchAction = 'none'; document.body.style.overflow = 'hidden'; } catch (err) {}
+            // create floating ghost to follow finger for better UX on mobile
+            try { createTouchGhost(el, touchStartX, touchStartY); } catch (e) {}
         } catch (err) {}
+    }
+
+    function createTouchGhost(el, clientX, clientY) {
+        clearTouchGhost();
+        try {
+            const rect = el.getBoundingClientRect();
+            const ghost = el.cloneNode(true);
+            ghost.classList.add('touch-ghost');
+            ghost.style.position = 'fixed';
+            ghost.style.left = (clientX - rect.width / 2) + 'px';
+            ghost.style.top = (clientY - rect.height / 2) + 'px';
+            ghost.style.width = rect.width + 'px';
+            ghost.style.height = rect.height + 'px';
+            ghost.style.pointerEvents = 'none';
+            ghost.style.zIndex = 9999;
+            ghost.style.opacity = '0.95';
+            ghost.style.transform = 'translate(0,0)';
+            document.body.appendChild(ghost);
+            touchGhost = { el: ghost, w: rect.width, h: rect.height };
+        } catch (e) { touchGhost = null; }
+    }
+
+    function moveTouchGhost(clientX, clientY) {
+        if (!touchGhost || !touchGhost.el) return;
+        try {
+            const left = (clientX - touchGhost.w / 2);
+            const top = (clientY - touchGhost.h / 2);
+            touchGhost.el.style.left = left + 'px';
+            touchGhost.el.style.top = top + 'px';
+        } catch (e) {}
+    }
+
+    function clearTouchGhost() {
+        if (!touchGhost) return;
+        try { if (touchGhost.el && touchGhost.el.parentNode) touchGhost.el.parentNode.removeChild(touchGhost.el); } catch (e) {}
+        touchGhost = null;
     }
 
     // Touch drop indicator state
@@ -2107,8 +2146,9 @@ window.onload = function () {
         const t = e.touches[0];
         touchStartX = t.clientX; touchStartY = t.clientY;
         const target = e.target;
+        // Use non-passive so we can prevent default on move while dragging
         touchLongPressTimer = setTimeout(() => beginDragFromTarget(target), LONG_PRESS_MS);
-    }, { passive: true });
+    }, { passive: false });
 
     document.addEventListener('touchmove', (e) => {
         if (touchLongPressTimer) {
@@ -2128,7 +2168,8 @@ window.onload = function () {
         const touch = e.touches[0];
         if (e.cancelable) e.preventDefault();
         handleAutoScrollDuringDrag({ clientY: touch.clientY });
-        // Find drop target and show indicator
+        // Move ghost and show drop target
+        try { moveTouchGhost(touch.clientX, touch.clientY); } catch (err) {}
         const info = findDropAtPoint(touch.clientX, touch.clientY);
         showTouchIndicator(info);
     }, { passive: false });
@@ -2141,11 +2182,12 @@ window.onload = function () {
         if (draggedElement) draggedElement.classList.remove('dragging');
         if (tasksContainer) tasksContainer.classList.remove('dragging-active');
         try { if (tasksContainer) tasksContainer.style.touchAction = ''; document.body.style.overflow = ''; } catch (err) {}
+        try { clearTouchGhost(); } catch (e) {}
         draggedElement = null;
         draggedIndex = null;
     }
 
-    document.addEventListener('touchend', async (e) => { await performTouchDrop(); endTouchDrag(); }, { passive: true });
+    document.addEventListener('touchend', async (e) => { await performTouchDrop(); endTouchDrag(); }, { passive: false });
     document.addEventListener('touchcancel', (e) => { endTouchDrag(); }, { passive: true });
 
     // Pointer fallback for PWAs/Android: use pointer long-press
@@ -2157,7 +2199,7 @@ window.onload = function () {
         pointerStartX = e.clientX; pointerStartY = e.clientY;
         const target = e.target;
         pointerLongPressTimer = setTimeout(() => beginDragFromTarget(target), LONG_PRESS_MS);
-    }, { passive: true });
+    }, { passive: false });
 
     document.addEventListener('pointermove', (e) => {
         if (pointerLongPressTimer) {
@@ -2167,10 +2209,12 @@ window.onload = function () {
         }
         if (!touchDragging) return;
         handleAutoScrollDuringDrag(e);
-    }, { passive: true });
+        try { moveTouchGhost(e.clientX, e.clientY); } catch (err) {}
+    }, { passive: false });
 
     document.addEventListener('pointerup', (e) => {
         if (pointerLongPressTimer) { clearTimeout(pointerLongPressTimer); pointerLongPressTimer = null; }
-        endTouchDrag();
+        // If we were dragging, perform drop then cleanup
+        (async () => { await performTouchDrop(); endTouchDrag(); })();
     });
 };
