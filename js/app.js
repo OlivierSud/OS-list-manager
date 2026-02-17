@@ -43,8 +43,12 @@ let draggedIndex = null;
 
 // Drag / Auto-scroll configuration (adjust these values to tune behavior)
 // You can change them directly in code or at runtime via `window.DRAG_CONFIG`.
+// By default we use a ratio of the container height for activation (e.g. 0.25 = 1/4 of screen).
 const DRAG_CONFIG = {
-    AUTO_SCROLL_THRESHOLD: 300, // px from edge to start scrolling (increase for larger activation zone)
+    // If set to a number between 0 and 1, uses this fraction of the container height.
+    AUTO_SCROLL_THRESHOLD_RATIO: 0.25,
+    // Backwards-compatible pixel fallback (if ratio is null):
+    AUTO_SCROLL_THRESHOLD: null,
     AUTO_SCROLL_STEP: 24 // px per tick
 };
 window.DRAG_CONFIG = DRAG_CONFIG;
@@ -80,7 +84,17 @@ function handleAutoScrollDuringDrag(e) {
     if (!tasksContainer) return;
     const rect = tasksContainer.getBoundingClientRect();
     const y = e.clientY;
-    const threshold = (window.DRAG_CONFIG && window.DRAG_CONFIG.AUTO_SCROLL_THRESHOLD) || DRAG_CONFIG.AUTO_SCROLL_THRESHOLD;
+    // Determine threshold: prefer ratio-based threshold (fraction of container height).
+    const cfg = window.DRAG_CONFIG || DRAG_CONFIG;
+    let threshold = null;
+    if (typeof cfg.AUTO_SCROLL_THRESHOLD_RATIO === 'number' && cfg.AUTO_SCROLL_THRESHOLD_RATIO > 0 && cfg.AUTO_SCROLL_THRESHOLD_RATIO < 1) {
+        threshold = rect.height * cfg.AUTO_SCROLL_THRESHOLD_RATIO;
+    } else if (typeof cfg.AUTO_SCROLL_THRESHOLD === 'number') {
+        threshold = cfg.AUTO_SCROLL_THRESHOLD;
+    } else {
+        threshold = rect.height * 0.25; // default to 25% if nothing set
+    }
+
     if (y < rect.top + threshold) {
         startAutoScroll(tasksContainer, -1);
     } else if (y > rect.bottom - threshold) {
