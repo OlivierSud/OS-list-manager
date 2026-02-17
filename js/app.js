@@ -2154,7 +2154,8 @@ window.onload = function () {
         try { showToast(`Cible: ${currentTouchDrop.type} @ ${currentTouchDrop.index}`); } catch (e) {}
         const listId = state.activeListId;
         if (listId === null || listId === undefined) return;
-        const items = [...state.items[listId]];
+        const originalItems = [...state.items[listId]];
+        const items = [...originalItems];
         const dragIndex = draggedIndex;
         if (dragIndex === null || dragIndex === undefined) return;
 
@@ -2195,46 +2196,50 @@ window.onload = function () {
 
         } else {
             // item move
+            // Determine parent candidate from ORIGINAL items (before mutation)
+            let parentCandidate = null;
+            if (currentTouchDrop.type === 'item') {
+                parentCandidate = originalItems[currentTouchDrop.index];
+            } else if (currentTouchDrop.type === 'spacer') {
+                let look = currentTouchDrop.index - 1;
+                while (look >= 0) {
+                    const candidate = originalItems[look];
+                    if (candidate && candidate.isHeader) { parentCandidate = candidate; break; }
+                    look--;
+                }
+            }
+
+            // If parentCandidate points to the moved item itself (dropping around itself), find previous header
+            if (parentCandidate && parentCandidate.id === movedItem.id) {
+                let look = currentTouchDrop.index - 1;
+                while (look >= 0) {
+                    const candidate = originalItems[look];
+                    if (candidate && candidate.isHeader && candidate.id !== movedItem.id) { parentCandidate = candidate; break; }
+                    look--;
+                }
+                if (look < 0) parentCandidate = null;
+            }
+
+            // compute insertion index in the mutated items array
             let targetIndex = currentTouchDrop.index;
             if (currentTouchDrop.type === 'item') {
                 if (currentTouchDrop.insertAfter) targetIndex++;
             }
-
-            // adjust for removal
             if (dragIndex < targetIndex) targetIndex--;
 
             // remove and insert
             items.splice(dragIndex, 1);
             items.splice(targetIndex, 0, movedItem);
 
-            // Determine new parentId so the item inherits color/indentation correctly
-            let newParentId = null;
-            if (currentTouchDrop.type === 'item') {
-                const targetItem = items[targetIndex];
-                if (targetItem) {
-                    if (targetItem.isHeader) {
-                        // dropped on a header -> become child of that header
-                        newParentId = targetItem.id;
-                    } else {
-                        // dropped on a regular item -> inherit its parent
-                        newParentId = targetItem.parentId || null;
-                    }
-                }
-            } else if (currentTouchDrop.type === 'spacer') {
-                // Find nearest header above the spacer position
-                let look = currentTouchDrop.index - 1;
-                while (look >= 0) {
-                    const candidate = items[look];
-                    if (candidate && candidate.isHeader) { newParentId = candidate.id; break; }
-                    look--;
-                }
-                // if none found, newParentId stays null (root)
+            // Apply parent from candidate
+            if (parentCandidate) {
+                if (parentCandidate.isHeader) movedItem.parentId = parentCandidate.id;
+                else movedItem.parentId = parentCandidate.parentId || null;
+            } else {
+                movedItem.parentId = null;
             }
-
-            movedItem.parentId = newParentId;
-            movedItem.isStandalone = !newParentId;
-            // Clear explicit color so rendering inherits parent's color
-            movedItem.color = null;
+            movedItem.isStandalone = !movedItem.parentId;
+            movedItem.color = null; // allow inheritance
         }
 
         state.items[listId] = items;
