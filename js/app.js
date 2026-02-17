@@ -202,7 +202,7 @@ function initTokenClient() {
             scope: SCOPES,
             callback: (tokenResponse) => {
                 if (tokenResponse.error) {
-                    alert("Erreur d'authentification: " + tokenResponse.error);
+                    console.error("Erreur d'authentification: " + tokenResponse.error);
                     console.error("Auth Error:", tokenResponse);
                     return;
                 }
@@ -219,7 +219,7 @@ function initTokenClient() {
                 });
             },
             error_callback: (error) => {
-                alert("Erreur de connexion Google: " + error.message);
+                console.error("Erreur de connexion Google: " + error.message);
                 console.error("Google Auth Error:", error);
             }
         });
@@ -277,7 +277,7 @@ function handleAuthClick() {
     if (tokenClient) {
         tokenClient.requestAccessToken();
     } else {
-        alert("Google API not loaded yet. Check internet connection.");
+        console.error("Google API not loaded yet. Check internet connection.");
     }
 }
 
@@ -292,7 +292,7 @@ async function fetchSheetData() {
         });
 
         if (metaResponse.status === 403) {
-            alert("Accès refusé. Vérifiez que :\n1. Votre email est ajouté dans le Google Cloud Console (Test Users).\n2. Le fichier Google Sheet est partagé avec votre email (Éditeur).");
+            console.error("Accès refusé. Vérifiez les permissions et le partage de la feuille Google.");
             return;
         }
 
@@ -300,7 +300,7 @@ async function fetchSheetData() {
 
         if (metaData.error) {
             console.error('Google Sheets Meta Error:', metaData.error);
-            alert("Erreur Google Sheets: " + metaData.error.message);
+            console.error("Erreur Google Sheets: " + metaData.error.message);
             return;
         }
 
@@ -452,7 +452,7 @@ async function createListInSheet(name) {
             fetchSheetData(); // Refresh all data
         } else {
             console.error(data.error);
-            alert("Erreur création liste: " + data.error.message);
+            console.error("Erreur création liste: " + data.error.message);
         }
     } catch (e) {
         console.error(e);
@@ -487,7 +487,7 @@ async function addItemToSheet(listId, text, isHeader = false) {
             // fetchSheetData(); 
         } else {
             console.error(data.error);
-            alert("Erreur ajout item: " + data.error.message);
+            console.error("Erreur ajout item: " + data.error.message);
         }
     } catch (e) {
         console.error(e);
@@ -576,7 +576,7 @@ async function renameSheet(sheetId, newName) {
             }
             return true;
         } else {
-            alert("Erreur: " + data.error.message);
+            console.error("Erreur: " + data.error.message);
             return false;
         }
     } catch (e) { console.error(e); return false; }
@@ -599,7 +599,7 @@ async function duplicateSheet(sheetId) {
         });
         const data = await response.json();
         if (!data.error) fetchSheetData();
-        else alert("Erreur: " + data.error.message);
+        else console.error("Erreur: " + data.error.message);
     } catch (e) { console.error(e); }
 }
 
@@ -619,7 +619,7 @@ async function deleteSheet(sheetId) {
         });
         const data = await response.json();
         if (!data.error) fetchSheetData();
-        else alert("Erreur: " + data.error.message);
+        else console.error("Erreur: " + data.error.message);
     } catch (e) { console.error(e); }
 }
 
@@ -692,7 +692,7 @@ async function updateSheetColor(sheetId, hexColor) {
                 renderHome();
             }
         } else {
-            alert("Erreur: " + data.error.message);
+            console.error("Erreur: " + data.error.message);
         }
     } catch (e) {
         console.error(e);
@@ -715,7 +715,7 @@ async function deleteSheet(sheetId) {
         });
         const data = await response.json();
         if (!data.error) fetchSheetData();
-        else alert("Erreur: " + data.error.message);
+        else console.error("Erreur: " + data.error.message);
     } catch (e) { console.error(e); }
 }
 
@@ -2103,29 +2103,10 @@ window.onload = function () {
     let touchLastX = 0, touchLastY = 0;
     const LONG_PRESS_MS = 280;
 
-    // Simple toast helper to show short messages on the device when console isn't available
+    // Simple toast helper (disabled in production to avoid debug popups)
     function showToast(msg, duration = 2000) {
-        try {
-            // remove existing
-            const existing = document.getElementById('app-toast');
-            if (existing) existing.remove();
-            const t = document.createElement('div');
-            t.id = 'app-toast';
-            t.innerText = msg;
-            t.style.position = 'fixed';
-            t.style.left = '50%';
-            t.style.bottom = '80px';
-            t.style.transform = 'translateX(-50%)';
-            t.style.background = 'rgba(0,0,0,0.8)';
-            t.style.color = 'white';
-            t.style.padding = '8px 12px';
-            t.style.borderRadius = '8px';
-            t.style.zIndex = 999999;
-            t.style.fontSize = '14px';
-            t.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
-            document.body.appendChild(t);
-            setTimeout(() => { try { t.remove(); } catch (e) {} }, duration);
-        } catch (e) { /* ignore */ }
+        // intentionally no-op to remove debug popups; use console.log for debugging if needed
+        // console.log('Toast:', msg);
     }
 
     // persistent drop result panel removed (debug overlay)
