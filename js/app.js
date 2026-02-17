@@ -2209,6 +2209,14 @@ window.onload = function () {
                 }
             }
 
+            // show candidate info before mutation
+            try {
+                const candText = parentCandidate ? (parentCandidate.text || '[header]') : 'NONE';
+                const candId = parentCandidate ? parentCandidate.id : 'null';
+                showToast(`Parent ciblé: ${candText}`);
+                console.log('parentCandidate before move', { id: candId, text: candText });
+            } catch (e) {}
+
             // If parentCandidate points to the moved item itself (dropping around itself), find previous header
             if (parentCandidate && parentCandidate.id === movedItem.id) {
                 let look = currentTouchDrop.index - 1;
@@ -2240,6 +2248,8 @@ window.onload = function () {
             }
             movedItem.isStandalone = !movedItem.parentId;
             movedItem.color = null; // allow inheritance
+            // debug show moved item parent state
+            try { showToast(`Après: parentId=${movedItem.parentId ? movedItem.parentId : 'null'}`); console.log('movedItem after parent set', { id: movedItem.id, parentId: movedItem.parentId, isStandalone: movedItem.isStandalone }); } catch (e) {}
         }
 
         state.items[listId] = items;
