@@ -2123,16 +2123,34 @@ window.onload = function () {
             items.splice(dragIndex, 1);
             items.splice(targetIndex, 0, movedItem);
 
-            // Update parentId similar to drop handler
-            const targetEl = (currentTouchDrop.type === 'item') ? items[targetIndex] : null;
-            if (targetEl) {
-                // when dropped on an item, adopt its parent
-                movedItem.parentId = targetEl.parentId;
-                movedItem.isStandalone = targetEl.isStandalone;
-            } else {
-                movedItem.parentId = null;
-                movedItem.isStandalone = true;
+            // Determine new parentId so the item inherits color/indentation correctly
+            let newParentId = null;
+            if (currentTouchDrop.type === 'item') {
+                const targetItem = items[targetIndex];
+                if (targetItem) {
+                    if (targetItem.isHeader) {
+                        // dropped on a header -> become child of that header
+                        newParentId = targetItem.id;
+                    } else {
+                        // dropped on a regular item -> inherit its parent
+                        newParentId = targetItem.parentId || null;
+                    }
+                }
+            } else if (currentTouchDrop.type === 'spacer') {
+                // Find nearest header above the spacer position
+                let look = currentTouchDrop.index - 1;
+                while (look >= 0) {
+                    const candidate = items[look];
+                    if (candidate && candidate.isHeader) { newParentId = candidate.id; break; }
+                    look--;
+                }
+                // if none found, newParentId stays null (root)
             }
+
+            movedItem.parentId = newParentId;
+            movedItem.isStandalone = !newParentId;
+            // Clear explicit color so rendering inherits parent's color
+            movedItem.color = null;
         }
 
         state.items[listId] = items;
@@ -2190,31 +2208,32 @@ window.onload = function () {
     document.addEventListener('touchend', async (e) => { await performTouchDrop(); endTouchDrag(); }, { passive: false });
     document.addEventListener('touchcancel', (e) => { endTouchDrag(); }, { passive: true });
 
-    // Pointer fallback for PWAs/Android: use pointer long-press
-    let pointerLongPressTimer = null;
-    let pointerStartX = 0, pointerStartY = 0;
+    // Pointer fallback for environments without touch support. On Android we prefer native touch long-press.
+    if (!('ontouchstart' in window)) {
+        let pointerLongPressTimer = null;
+        let pointerStartX = 0, pointerStartY = 0;
 
-    document.addEventListener('pointerdown', (e) => {
-        if (e.pointerType !== 'touch') return;
-        pointerStartX = e.clientX; pointerStartY = e.clientY;
-        const target = e.target;
-        pointerLongPressTimer = setTimeout(() => beginDragFromTarget(target), LONG_PRESS_MS);
-    }, { passive: false });
+        document.addEventListener('pointerdown', (e) => {
+            if (e.pointerType !== 'touch' && e.pointerType !== 'pen' && e.pointerType !== 'mouse') return;
+            pointerStartX = e.clientX; pointerStartY = e.clientY;
+            const target = e.target;
+            pointerLongPressTimer = setTimeout(() => beginDragFromTarget(target), LONG_PRESS_MS);
+        }, { passive: false });
 
-    document.addEventListener('pointermove', (e) => {
-        if (pointerLongPressTimer) {
-            const dx = Math.abs(e.clientX - pointerStartX);
-            const dy = Math.abs(e.clientY - pointerStartY);
-            if (dx > 10 || dy > 10) { clearTimeout(pointerLongPressTimer); pointerLongPressTimer = null; }
-        }
-        if (!touchDragging) return;
-        handleAutoScrollDuringDrag(e);
-        try { moveTouchGhost(e.clientX, e.clientY); } catch (err) {}
-    }, { passive: false });
+        document.addEventListener('pointermove', (e) => {
+            if (pointerLongPressTimer) {
+                const dx = Math.abs(e.clientX - pointerStartX);
+                const dy = Math.abs(e.clientY - pointerStartY);
+                if (dx > 10 || dy > 10) { clearTimeout(pointerLongPressTimer); pointerLongPressTimer = null; }
+            }
+            if (!touchDragging) return;
+            handleAutoScrollDuringDrag(e);
+            try { moveTouchGhost(e.clientX, e.clientY); } catch (err) {}
+        }, { passive: false });
 
-    document.addEventListener('pointerup', (e) => {
-        if (pointerLongPressTimer) { clearTimeout(pointerLongPressTimer); pointerLongPressTimer = null; }
-        // If we were dragging, perform drop then cleanup
-        (async () => { await performTouchDrop(); endTouchDrag(); })();
-    });
+        document.addEventListener('pointerup', (e) => {
+            if (pointerLongPressTimer) { clearTimeout(pointerLongPressTimer); pointerLongPressTimer = null; }
+            (async () => { await performTouchDrop(); endTouchDrag(); })();
+        });
+    }
 };
