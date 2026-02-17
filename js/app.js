@@ -1628,6 +1628,30 @@ function setupDragHandlers(element, index, isHeader) {
         syncOrderToSheet(listId);
         stopAutoScroll();
     });
+
+    // Touch: allow immediate drag start when touching the drag handle (six dots)
+    try {
+        const handle = element.querySelector && element.querySelector('.drag-handle');
+        if (handle) {
+            handle.addEventListener('touchstart', (e) => {
+                // start drag immediately from handle on touch
+                if (!e.touches || !e.touches[0]) return;
+                const t = e.touches[0];
+                touchStartX = t.clientX; touchStartY = t.clientY;
+                e.stopPropagation();
+                e.preventDefault();
+                beginDragFromTarget(handle);
+            }, { passive: false });
+
+            handle.addEventListener('pointerdown', (e) => {
+                if (e.pointerType === 'touch') {
+                    touchStartX = e.clientX; touchStartY = e.clientY;
+                    e.stopPropagation();
+                    beginDragFromTarget(handle);
+                }
+            }, { passive: false });
+        }
+    } catch (e) {}
 }
 
 function setupBoundaryDragHandlers(element, position) {
@@ -1991,9 +2015,8 @@ window.onload = function () {
         }
     });
 
-    // Touch & Pointer support: use long-press detection to begin drag on mobile/PWA
+    // Touch & Pointer support: use handle-driven drags on mobile/PWA
     let touchDragging = false;
-    let touchLongPressTimer = null;
     let touchStartX = 0, touchStartY = 0;
     let touchLastX = 0, touchLastY = 0;
     const LONG_PRESS_MS = 280;
@@ -2293,23 +2316,10 @@ window.onload = function () {
         const t = e.touches[0];
         touchStartX = t.clientX; touchStartY = t.clientY;
         const target = e.target;
-        // Use non-passive so we can prevent default on move while dragging
-        touchLongPressTimer = setTimeout(() => beginDragFromTarget(target), LONG_PRESS_MS);
+        // Long-press globally disabled: drag starts only from the `.drag-handle`.
     }, { passive: false });
 
     document.addEventListener('touchmove', (e) => {
-        if (touchLongPressTimer) {
-            const t = e.touches && e.touches[0];
-            if (t) {
-                const dx = Math.abs(t.clientX - touchStartX);
-                const dy = Math.abs(t.clientY - touchStartY);
-                if (dx > 10 || dy > 10) {
-                    clearTimeout(touchLongPressTimer);
-                    touchLongPressTimer = null;
-                }
-            }
-        }
-
         if (!touchDragging) return;
         if (!e.touches || !e.touches[0]) return;
         const touch = e.touches[0];
@@ -2325,7 +2335,6 @@ window.onload = function () {
     }, { passive: false });
 
     function endTouchDrag() {
-        if (touchLongPressTimer) { clearTimeout(touchLongPressTimer); touchLongPressTimer = null; }
         if (!touchDragging) return;
         touchDragging = false;
         stopAutoScroll();
