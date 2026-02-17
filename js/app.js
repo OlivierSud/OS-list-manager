@@ -1531,7 +1531,7 @@ function setupDragHandlers(element, index, isHeader) {
         });
         stopAutoScroll();
         try {
-            if (tasksContainer) tasksContainer.style.touchAction = '';
+            if (tasksContainer) tasksContainer.style.touchAction = 'auto';
             document.body.style.overflow = '';
         } catch (err) {}
         // Ensure any touch ghost from mobile interaction is removed
@@ -2383,7 +2383,7 @@ window.onload = function () {
         stopAutoScroll();
         if (draggedElement) draggedElement.classList.remove('dragging');
         if (tasksContainer) tasksContainer.classList.remove('dragging-active');
-        try { if (tasksContainer) tasksContainer.style.touchAction = ''; document.body.style.overflow = ''; } catch (err) {}
+        try { if (tasksContainer) tasksContainer.style.touchAction = 'auto'; document.body.style.overflow = ''; } catch (err) {}
         try { clearTouchGhost(); } catch (e) {}
         draggedElement = null;
         draggedIndex = null;

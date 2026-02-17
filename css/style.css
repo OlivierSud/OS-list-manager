@@ -70,6 +70,12 @@ main {
     /* The actual visible gap between header border and first item */
 }
 
+/* Ensure task/list containers allow native vertical panning on touch devices */
+#tasks-container, #lists-container {
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+}
+
 /* Utilities */
 .hidden {
     display: none !important;
