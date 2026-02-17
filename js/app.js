@@ -1161,6 +1161,34 @@ function openList(id) {
     pushAppState({ app: 'oslist', view: 'list', id: id });
 }
 
+// Refresh app by clearing caches and unregistering service workers, then reload.
+async function refreshApp() {
+    try {
+        // Clear Cache Storage entries
+        if ('caches' in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map(k => caches.delete(k)));
+            console.log('Cleared CacheStorage entries:', keys);
+        }
+
+        // Unregister service workers
+        if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map(r => r.unregister()));
+            console.log('Unregistered service workers');
+        }
+
+        // Optionally clear some local caches used by app (not removing auth tokens)
+        // localStorage.clear(); // <-- commented out to avoid logging user out
+
+        // Force reload
+        location.reload();
+    } catch (e) {
+        console.error('Failed to refresh app:', e);
+        try { location.reload(); } catch (err) {}
+    }
+}
+
 // Push history state when navigating within the app so browser back stays inside the app
 function pushAppState(stateObj) {
     try {

@@ -58,26 +58,11 @@
     <!-- Header -->
     <header class="glass-panel">
       <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <button id="back-button" class="btn-icon hidden" onclick="window.history.back()">
+        <button id="back-button" class="btn-icon hidden" onclick="goHome()">
           <i data-lucide="arrow-left"></i>
         </button>
 
         <h1 id="header-title">Mes Listes</h1>
-      </div>
-
-      <div style="display: flex; gap: 0.25rem; align-items: center;">
-        <div id="search-container" class="hidden" style="position: relative; margin-right: 0.5rem;">
-          <i data-lucide="search"
-            style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-secondary);"></i>
-          <input type="text" id="search-input" placeholder="Rechercher..."
-            style="background: var(--bg-dark); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; padding: 4px 8px 4px 28px; font-size: 13px; width: 100px; outline: none; transition: width 0.3s; height: 28px;">
-        </div>
-        <button id="filter-button" class="btn-icon hidden">
-          <i data-lucide="filter"></i>
-        </button>
-        <button id="settings-button" class="btn-icon">
-          <i data-lucide="settings"></i>
-        </button>
 
         <div id="user-profile-container" class="hidden"
           style="position: relative; display: flex; align-items: center; margin-left: 0.5rem;">
@@ -93,11 +78,29 @@
             style="position: absolute; top: 120%; right: 0; min-width: max-content; padding: 0.5rem; z-index: 1000; animation: fadeIn 0.1s ease-out;">
             <button id="btn-logout-header" class="btn-icon"
               style="width: 100%; justify-content: flex-start; color: var(--danger-color); font-size: 0.9rem; white-space: nowrap;">
-              <i data-lucide="log-out" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Déconnexion /
-              Changer
+              <i data-lucide="log-out" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Déconnexion / Changer
             </button>
           </div>
         </div>
+
+      </div>
+
+      <div style="display: flex; gap: 0.25rem; align-items: center;">
+        <div id="search-container" class="hidden" style="position: relative; margin-right: 0.5rem;">
+          <i data-lucide="search"
+            style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-secondary);"></i>
+          <input type="text" id="search-input" placeholder="Rechercher..."
+            style="background: var(--bg-dark); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; padding: 4px 8px 4px 28px; font-size: 13px; width: 100px; outline: none; transition: width 0.3s; height: 28px;">
+        </div>
+        <button id="filter-button" class="btn-icon hidden">
+          <i data-lucide="filter"></i>
+        </button>
+        <button id="refresh-button" class="btn-icon" title="Rafraîchir l'application" onclick="refreshApp()">
+          <i data-lucide="refresh-cw"></i>
+        </button>
+        <button id="settings-button" class="btn-icon">
+          <i data-lucide="settings"></i>
+        </button>
       </div>
     </header>
 
