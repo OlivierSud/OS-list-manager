@@ -34,6 +34,7 @@ const userAvatar = document.getElementById('user-avatar');
 const userAvatarFallback = document.getElementById('user-avatar-fallback');
 const userMenu = document.getElementById('user-menu');
 const btnLogoutHeader = document.getElementById('btn-logout-header');
+const refreshButton = document.getElementById('refresh-button');
 
 let currentListId = null;
 let currentListName = "";
@@ -815,14 +816,17 @@ function renderHome() {
             }
             if (userAvatarFallback) userAvatarFallback.classList.add('hidden');
             userProfileContainer.classList.remove('hidden');
+            if (refreshButton) refreshButton.classList.remove('hidden');
         } else if (state.userEmail) {
             // Show Fallback
             if (userAvatar) userAvatar.classList.add('hidden');
             if (userAvatarFallback) userAvatarFallback.classList.remove('hidden');
             userProfileContainer.classList.remove('hidden');
+            if (refreshButton) refreshButton.classList.remove('hidden');
         } else {
             // Hide all
             userProfileContainer.classList.add('hidden');
+            if (refreshButton) refreshButton.classList.add('hidden');
         }
     }
 
@@ -910,6 +914,12 @@ function renderList(listId) {
     // Update title with color badge
     const colorBadge = `<span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: ${list.color}; margin-right: 0.5rem; border: 1px solid rgba(255,255,255,0.2);"></span>`;
     headerTitle.innerHTML = colorBadge + list.name;
+
+    // Ensure refresh button stays visible in list view when user is signed in
+    if (refreshButton) {
+        if (state.userPicture || state.userEmail) refreshButton.classList.remove('hidden');
+        else refreshButton.classList.add('hidden');
+    }
 
     // Clear and rebuild content
     tasksContainer.innerHTML = '';
@@ -2046,32 +2056,7 @@ window.onload = function () {
         } catch (e) { /* ignore */ }
     }
 
-    // Persistent drop result panel (tap to dismiss) for mobile inspection
-    function showDropResultPanel(text) {
-        try {
-            const existing = document.getElementById('drop-result-panel');
-            if (existing) existing.remove();
-            const p = document.createElement('div');
-            p.id = 'drop-result-panel';
-            p.innerText = text;
-            p.style.position = 'fixed';
-            p.style.top = '12px';
-            p.style.left = '50%';
-            p.style.transform = 'translateX(-50%)';
-            p.style.background = 'rgba(30,30,30,0.95)';
-            p.style.color = '#fff';
-            p.style.padding = '10px 14px';
-            p.style.borderRadius = '10px';
-            p.style.zIndex = 999999;
-            p.style.fontSize = '13px';
-            p.style.boxShadow = '0 6px 18px rgba(0,0,0,0.4)';
-            p.style.maxWidth = '92%';
-            p.style.textAlign = 'center';
-            p.style.wordBreak = 'break-word';
-            p.onclick = () => { try { p.remove(); } catch (e) {} };
-            document.body.appendChild(p);
-        } catch (e) { console.error('showDropResultPanel failed', e); }
-    }
+    // persistent drop result panel removed (debug overlay)
     
     let touchGhost = null; // visual floating clone while dragging on touch
 
@@ -2264,7 +2249,7 @@ window.onload = function () {
                 const candText = parentCandidate ? (parentCandidate.text || '[header]') : 'NONE';
                 const candId = parentCandidate ? parentCandidate.id : 'null';
                 showToast(`Parent ciblé: ${candText}`);
-                try { showDropResultPanel(`Parent ciblé: ${candText}`); } catch (e) {}
+                // debug overlay removed; keep lightweight toast
                 console.log('parentCandidate before move', { id: candId, text: candText });
             } catch (e) {}
 
@@ -2300,7 +2285,7 @@ window.onload = function () {
             movedItem.isStandalone = !movedItem.parentId;
             movedItem.color = null; // allow inheritance
             // debug show moved item parent state
-            try { showToast(`Après: parentId=${movedItem.parentId ? movedItem.parentId : 'null'}`); showDropResultPanel(`Après: parentId=${movedItem.parentId ? movedItem.parentId : 'null'}`); console.log('movedItem after parent set', { id: movedItem.id, parentId: movedItem.parentId, isStandalone: movedItem.isStandalone }); } catch (e) {}
+            try { showToast(`Après: parentId=${movedItem.parentId ? movedItem.parentId : 'null'}`); console.log('movedItem after parent set', { id: movedItem.id, parentId: movedItem.parentId, isStandalone: movedItem.isStandalone }); } catch (e) {}
         }
 
         state.items[listId] = items;

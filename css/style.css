@@ -35,6 +35,13 @@
     line-height: 1.5;
 }
 
+html, body, #app, main {
+    /* Prevent pull-to-refresh / overscroll navigation on supporting browsers (Android PWA/Chrome)
+       and ensure the app's own scrolling is used. */
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
+}
+
 body {
     margin: 0;
     display: flex;
@@ -43,7 +50,6 @@ body {
     background-color: var(--bg-primary);
     /* Flat Professional Look */
     color: var(--text-primary);
-    overscroll-behavior-y: none;
     font-size: 14px;
     /* Slightly smaller, more technical */
 }
