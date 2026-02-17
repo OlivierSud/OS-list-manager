@@ -1963,88 +1963,91 @@ window.onload = function () {
         }
     });
 
-    // Touch support: detect touch-based drags on mobile and trigger auto-scroll
+    // Touch & Pointer support: use long-press detection to begin drag on mobile/PWA
     let touchDragging = false;
-    document.addEventListener('touchstart', (e) => {
+    let touchLongPressTimer = null;
+    let touchStartX = 0, touchStartY = 0;
+    const LONG_PRESS_MS = 280;
+
+    function beginDragFromTarget(target) {
         try {
-            const targetHandle = e.target.closest && e.target.closest('.drag-handle');
-            if (targetHandle) {
-                const el = targetHandle.closest && targetHandle.closest('[draggable]');
-                if (el) {
-                    draggedElement = el;
-                    draggedIndex = parseInt(el.dataset.index);
-                    touchDragging = true;
-                    el.classList.add('dragging');
-                    if (tasksContainer) tasksContainer.classList.add('dragging-active');
-                    // Prevent native touch scroll while in drag mode
-                    try { if (tasksContainer) tasksContainer.style.touchAction = 'none'; document.body.style.overflow = 'hidden'; } catch (err) {}
-                }
-            }
+            const el = target.closest && target.closest('[draggable]');
+            if (!el) return;
+            draggedElement = el;
+            draggedIndex = parseInt(el.dataset.index);
+            touchDragging = true;
+            el.classList.add('dragging');
+            if (tasksContainer) tasksContainer.classList.add('dragging-active');
+            try { if (tasksContainer) tasksContainer.style.touchAction = 'none'; document.body.style.overflow = 'hidden'; } catch (err) {}
         } catch (err) {}
+    }
+
+    document.addEventListener('touchstart', (e) => {
+        if (!e.touches || !e.touches[0]) return;
+        const t = e.touches[0];
+        touchStartX = t.clientX; touchStartY = t.clientY;
+        const target = e.target;
+        touchLongPressTimer = setTimeout(() => beginDragFromTarget(target), LONG_PRESS_MS);
     }, { passive: true });
 
     document.addEventListener('touchmove', (e) => {
+        if (touchLongPressTimer) {
+            const t = e.touches && e.touches[0];
+            if (t) {
+                const dx = Math.abs(t.clientX - touchStartX);
+                const dy = Math.abs(t.clientY - touchStartY);
+                if (dx > 10 || dy > 10) {
+                    clearTimeout(touchLongPressTimer);
+                    touchLongPressTimer = null;
+                }
+            }
+        }
+
         if (!touchDragging) return;
         if (!e.touches || !e.touches[0]) return;
         const touch = e.touches[0];
-        // synthesize a minimal event for auto-scroll handler
+        if (e.cancelable) e.preventDefault();
         handleAutoScrollDuringDrag({ clientY: touch.clientY });
-    }, { passive: true });
+    }, { passive: false });
 
-    document.addEventListener('touchend', (e) => {
+    function endTouchDrag() {
+        if (touchLongPressTimer) { clearTimeout(touchLongPressTimer); touchLongPressTimer = null; }
         if (!touchDragging) return;
         touchDragging = false;
         stopAutoScroll();
         if (draggedElement) draggedElement.classList.remove('dragging');
         if (tasksContainer) tasksContainer.classList.remove('dragging-active');
+        try { if (tasksContainer) tasksContainer.style.touchAction = ''; document.body.style.overflow = ''; } catch (err) {}
         draggedElement = null;
         draggedIndex = null;
-    });
-    // restore touch-action and body overflow after touch ends
-    document.addEventListener('touchend', () => { try { if (tasksContainer) tasksContainer.style.touchAction = ''; document.body.style.overflow = ''; } catch (err) {} }, { passive: true });
+    }
 
-    document.addEventListener('touchcancel', () => {
-        if (!touchDragging) return;
-        touchDragging = false;
-        stopAutoScroll();
-        if (draggedElement) draggedElement.classList.remove('dragging');
-        if (tasksContainer) tasksContainer.classList.remove('dragging-active');
-        draggedElement = null;
-        draggedIndex = null;
-    });
+    document.addEventListener('touchend', (e) => { endTouchDrag(); }, { passive: true });
+    document.addEventListener('touchcancel', (e) => { endTouchDrag(); }, { passive: true });
 
-    // Pointer events fallback (better support in PWAs on Android)
-    let pointerDragging = false;
+    // Pointer fallback for PWAs/Android: use pointer long-press
+    let pointerLongPressTimer = null;
+    let pointerStartX = 0, pointerStartY = 0;
+
     document.addEventListener('pointerdown', (e) => {
         if (e.pointerType !== 'touch') return;
-        try {
-            const el = e.target.closest && e.target.closest('[draggable]');
-            if (el) {
-                draggedElement = el;
-                draggedIndex = parseInt(el.dataset.index);
-                pointerDragging = true;
-                el.classList.add('dragging');
-                if (tasksContainer) tasksContainer.classList.add('dragging-active');
-                try { if (tasksContainer) tasksContainer.style.touchAction = 'none'; document.body.style.overflow = 'hidden'; } catch (err) {}
-            }
-        } catch (err) {}
+        pointerStartX = e.clientX; pointerStartY = e.clientY;
+        const target = e.target;
+        pointerLongPressTimer = setTimeout(() => beginDragFromTarget(target), LONG_PRESS_MS);
     }, { passive: true });
 
     document.addEventListener('pointermove', (e) => {
-        if (!pointerDragging) return;
-        if (e.clientY === undefined) return;
+        if (pointerLongPressTimer) {
+            const dx = Math.abs(e.clientX - pointerStartX);
+            const dy = Math.abs(e.clientY - pointerStartY);
+            if (dx > 10 || dy > 10) { clearTimeout(pointerLongPressTimer); pointerLongPressTimer = null; }
+        }
+        if (!touchDragging) return;
         handleAutoScrollDuringDrag(e);
     }, { passive: true });
 
     document.addEventListener('pointerup', (e) => {
-        if (!pointerDragging) return;
-        pointerDragging = false;
-        stopAutoScroll();
-        if (draggedElement) draggedElement.classList.remove('dragging');
-        if (tasksContainer) tasksContainer.classList.remove('dragging-active');
-        draggedElement = null;
-        draggedIndex = null;
+        if (pointerLongPressTimer) { clearTimeout(pointerLongPressTimer); pointerLongPressTimer = null; }
+        endTouchDrag();
     });
-    // restore touchAction on pointer up (in case pointer events used)
-    document.addEventListener('pointerup', (e) => { try { if (tasksContainer) tasksContainer.style.touchAction = ''; document.body.style.overflow = ''; } catch (err) {} }, { passive: true });
 };
