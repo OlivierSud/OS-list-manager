@@ -200,6 +200,13 @@ header {
     background-color: var(--bg-primary);
     /* Ensure background covers content behind sticky */
     border-bottom: 2px solid var(--accent-color);
+    overflow: visible !important;
+    /* Allow menu to overflow */
+}
+
+/* Specific override for header using glass-panel to ensure dropdowns work */
+header.glass-panel {
+    overflow: visible !important;
 }
 
 h1 {

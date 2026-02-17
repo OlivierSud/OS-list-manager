@@ -28,6 +28,13 @@ const colorModal = document.getElementById('color-modal');
 const colorGrid = document.getElementById('color-grid');
 const btnColorCancel = document.getElementById('btn-color-cancel');
 
+// User Profile Elements
+const userProfileContainer = document.getElementById('user-profile-container');
+const userAvatar = document.getElementById('user-avatar');
+const userAvatarFallback = document.getElementById('user-avatar-fallback');
+const userMenu = document.getElementById('user-menu');
+const btnLogoutHeader = document.getElementById('btn-logout-header');
+
 let currentListId = null;
 let currentListName = "";
 let collapsedSections = new Set(); // Track collapsed section indices
@@ -59,7 +66,9 @@ let state = {
     isHeaderMode: false,
     filter: 'all', // Global default, but we'll use per-list filters
     searchQuery: '',
-    userEmail: null
+    searchQuery: '',
+    userEmail: null,
+    userPicture: null
 };
 
 // PWA Install Prompt
@@ -107,7 +116,7 @@ function generateId() {
 const CLIENT_ID = '356152485310-ofia0pr8hcig7s906tfu1c9v1us7s4gb.apps.googleusercontent.com';
 const API_KEY = 'AIzaSyBA2lV9mm9_tNIpErOd9yO5lMjlIYtlCwM';
 const SPREADSHEET_ID = '17nkELFwjGJrOjCBHTunDsAdg1GE6ylIZYc6jblAB-ps';
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email openid';
+const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid';
 
 let tokenClient;
 let accessToken = null;
@@ -119,6 +128,11 @@ function initTokenClient() {
             client_id: CLIENT_ID,
             scope: SCOPES,
             callback: (tokenResponse) => {
+                if (tokenResponse.error) {
+                    alert("Erreur d'authentification: " + tokenResponse.error);
+                    console.error("Auth Error:", tokenResponse);
+                    return;
+                }
                 accessToken = tokenResponse.access_token;
                 // Save token and expiry
                 const expiry = Date.now() + (tokenResponse.expires_in * 1000);
@@ -131,6 +145,10 @@ function initTokenClient() {
                     fetchSheetData();
                 });
             },
+            error_callback: (error) => {
+                alert("Erreur de connexion Google: " + error.message);
+                console.error("Google Auth Error:", error);
+            }
         });
 
         // Try to recover session
@@ -159,6 +177,7 @@ async function fetchUserEmail() {
         });
         const data = await response.json();
         state.userEmail = data.email;
+        state.userPicture = data.picture;
         console.log("Logged in as:", state.userEmail);
     } catch (e) {
         console.error("Failed to fetch user email", e);
@@ -198,10 +217,17 @@ async function fetchSheetData() {
         const metaResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}?fields=sheets.properties`, {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
+
+        if (metaResponse.status === 403) {
+            alert("Accès refusé. Vérifiez que :\n1. Votre email est ajouté dans le Google Cloud Console (Test Users).\n2. Le fichier Google Sheet est partagé avec votre email (Éditeur).");
+            return;
+        }
+
         const metaData = await metaResponse.json();
 
         if (metaData.error) {
             console.error('Google Sheets Meta Error:', metaData.error);
+            alert("Erreur Google Sheets: " + metaData.error.message);
             return;
         }
 
@@ -255,24 +281,21 @@ async function fetchSheetData() {
                         let isSubHeader = parts.includes('SUBHEADER');
 
                         // Backward compatibility and inference
+                        // Treating all headers as Main Headers
                         if (isHeader) {
                             if (!uid) uid = generateId();
                             lastHeaderUid = uid;
-                            // If a header has a PID, it implies it is a subheader
-                            if (pid) isSubHeader = true;
+                            isSubHeader = false; // FORCE FALSE
                         } else {
-                            // It's a task. A task can't be a subheader.
+                            // It's a task.
                             isSubHeader = false;
-
-                            // If it has no PID and is not explicitly standalone, 
-                            // it likely belongs to the preceding header.
-                            if (!pid && !isStandalone) {
-                                if (lastHeaderUid) {
-                                    pid = lastHeaderUid;
-                                } else {
-                                    // Only truly standalone if there is NO preceding header at all (top of list)
-                                    isStandalone = true;
-                                }
+                            isStandalone = false; // FORCE FALSE for simplification? 
+                            // Or keep standalone if strictly no header?
+                            // Let's keep logic: if no header seen yet, it's standalone.
+                            if (lastHeaderUid) {
+                                pid = lastHeaderUid;
+                            } else {
+                                isStandalone = true;
                             }
                         }
 
@@ -610,7 +633,14 @@ function getRandomColor(index) {
     return COLOR_PALETTE[index % COLOR_PALETTE.length];
 }
 
+
 let colorTarget = { type: 'list', id: null }; // 'list' or 'section'
+
+window.openSectionColor = function (index) {
+    colorTarget = { type: 'section', index: index };
+    openColorModal();
+}
+
 
 function initColorPicker() {
     colorGrid.innerHTML = '';
@@ -704,8 +734,30 @@ function renderHome() {
     }
 
     // Show Main App
+    // Show Main App
     app.classList.remove('hidden');
     loginContainer.classList.add('hidden');
+
+    // Update Avatar Logic
+    if (userProfileContainer) {
+        if (state.userPicture) {
+            // Show Image
+            if (userAvatar) {
+                userAvatar.src = state.userPicture;
+                userAvatar.classList.remove('hidden');
+            }
+            if (userAvatarFallback) userAvatarFallback.classList.add('hidden');
+            userProfileContainer.classList.remove('hidden');
+        } else if (state.userEmail) {
+            // Show Fallback
+            if (userAvatar) userAvatar.classList.add('hidden');
+            if (userAvatarFallback) userAvatarFallback.classList.remove('hidden');
+            userProfileContainer.classList.remove('hidden');
+        } else {
+            // Hide all
+            userProfileContainer.classList.add('hidden');
+        }
+    }
 
     // Hide/Show elements for Home View
     listsContainer.classList.remove('hidden');
@@ -927,7 +979,7 @@ function renderList(listId) {
                 }
 
                 const bulletColor = effectiveColor || '#555';
-                const colorBullet = `<span class="section-bullet" style="background: ${bulletColor};" onclick="event.stopPropagation(); colorTarget={type:'section', index:${index}}; openColorModal();"></span>`;
+                const colorBullet = `<span class="section-bullet" style="background: ${bulletColor};" onclick="event.stopPropagation(); window.openSectionColor(${index});"></span>`;
 
                 el.innerHTML = `
                     <div style="display: flex; align-items: center; flex: 1;">
@@ -940,8 +992,8 @@ function renderList(listId) {
                         <span class="section-count" style="margin-left: 0.5rem; font-size: 0.8rem; opacity: 0.8; font-weight: bold; color: var(--text-secondary);">(${itemCount})</span>
                     </div>
                     <div style="display: flex; gap: 0.25rem;">
-                        <button class="btn-icon-small" onclick="event.stopPropagation(); openSectionOptions(${index})">
-                            <i data-lucide="more-vertical" style="width: 14px; height: 14px;"></i>
+                        <button class="btn-delete-item" onclick="event.stopPropagation(); deleteListItem(${index})">
+                            <i data-lucide="x" style="width: 14px; height: 14px;"></i>
                         </button>
                     </div>
                 `;
@@ -1263,6 +1315,34 @@ function setupDragHandlers(element, index, isHeader) {
         element.classList.add('dragging');
         tasksContainer.classList.add('dragging-active'); // Show all spacers
         e.dataTransfer.effectAllowed = 'move';
+
+        // If dragging a header, collapse ALL sections to prevent dropping inside them
+        // This simplifies the structure to a flat list of headers + collapsed items
+        if (isHeader) {
+            // Find all indices of headers
+            const listId = state.activeListId;
+            const items = state.items[listId];
+
+            // Loop through all items and ADD to collapsed set if it's a header
+            items.forEach((item, idx) => {
+                if (item.isHeader && !item.isSubHeader) {
+                    collapsedSections.add(idx);
+                }
+            });
+
+            // Visually hide children tasks to prevent dropping inside
+            // We select all task-items and hide them, simulating a full collapse view
+            // This does NOT break the drag of the header itself.
+            requestAnimationFrame(() => {
+                // Select all tasks that are NOT headers
+                const allTasks = tasksContainer.querySelectorAll('.task-item:not([data-is-header="true"])');
+                allTasks.forEach(t => t.classList.add('hidden'));
+
+                // Rotate all arrows
+                const allArrows = tasksContainer.querySelectorAll('.collapse-arrow');
+                allArrows.forEach(a => a.classList.add('collapsed'));
+            });
+        }
     });
 
     element.addEventListener('dragend', (e) => {
@@ -1355,8 +1435,15 @@ function setupDragHandlers(element, index, isHeader) {
             // We grab the whole section
             const sectionToMove = [];
             let i = dragIndex;
-            sectionToMove.push(items[i++]);
-            while (i < items.length && !items[i].isHeader) {
+
+            // First item is the header itself
+            const movingHeader = items[i++];
+            sectionToMove.push(movingHeader);
+
+            // Collect all items until the next header OR standalone item
+            while (i < items.length) {
+                const current = items[i];
+                if (current.isHeader || current.isStandalone) break;
                 sectionToMove.push(items[i++]);
             }
 
@@ -1385,27 +1472,9 @@ function setupDragHandlers(element, index, isHeader) {
             // Let's check the New Neighbors in `items`?
             // Or use the `dropIndex` element's properties.
 
-            const targetEl = state.items[listId][dropIndex]; // Pre-move state
-            // If we dropped INTO a main header section?
-            // Complexity: A header doesn't really have a parent unless it's a SubHeader.
-            // If we drop inside a Main Section, we become SubHeader.
-
-            // Let's use scan-up logic from new position
-            let newParentMain = null;
-            for (let j = realTargetIndex - 1; j >= 0; j--) {
-                if (items[j].isHeader && !items[j].isSubHeader) {
-                    newParentMain = items[j];
-                    break;
-                }
-            }
-
-            if (newParentMain) {
-                sectionToMove[0].isSubHeader = true;
-                sectionToMove[0].parentId = newParentMain.id;
-            } else {
-                sectionToMove[0].isSubHeader = false;
-                sectionToMove[0].parentId = null;
-            }
+            // Flatten logic: All headers are root
+            sectionToMove[0].isSubHeader = false;
+            sectionToMove[0].parentId = null;
 
             // Update children parentId
             sectionToMove.forEach(it => {
@@ -1473,14 +1542,24 @@ function setupBoundaryDragHandlers(element, position) {
 
         if (isHeaderMove) {
             let i = dragIndex;
-            itemsToMove.push(items[i++]);
-            while (i < items.length && !items[i].isHeader) {
+            const movingHeader = items[i++];
+            itemsToMove.push(movingHeader);
+
+            // Collect until next header OR standalone item
+            while (i < items.length) {
+                const current = items[i];
+                if (current.isHeader || current.isStandalone) break;
                 itemsToMove.push(items[i++]);
             }
             items.splice(dragIndex, itemsToMove.length);
             itemsToMove[0].isSubHeader = false;
             itemsToMove[0].isStandalone = false;
             itemsToMove[0].parentId = null;
+
+            // Update children parentId
+            itemsToMove.forEach(it => {
+                if (!it.isHeader) it.parentId = itemsToMove[0].id;
+            });
         } else {
             const [item] = items.splice(dragIndex, 1);
             item.isStandalone = true;
@@ -1521,9 +1600,31 @@ async function syncOrderToSheet(listId) {
     const values = items.map((item, idx) => {
         let meta = [];
         if (item.isStandalone) meta.push("STANDALONE");
-        if (item.isSubHeader) meta.push("SUBHEADER");
+        // REMOVED SUBHEADER
         if (item.isHeader && item.id) meta.push(`UID:${item.id}`);
-        if (item.parentId) meta.push(`PID:${item.parentId}`);
+        // We recalculate PID strictly based on current position!
+        // Find closest preceding header
+        let currentHeaderId = null;
+        for (let i = idx - 1; i >= 0; i--) {
+            if (items[i].isHeader) {
+                currentHeaderId = items[i].id;
+                break;
+            }
+        }
+
+        if (!item.isHeader) {
+            // Task: Set PID to currentHeaderId, UNLESS it's explicitly standalone
+            if (!item.isStandalone) {
+                item.parentId = currentHeaderId;
+            } else {
+                item.parentId = null;
+            }
+            if (item.parentId) meta.push(`PID:${item.parentId}`);
+        } else {
+            // Header: Is always root now. No PID.
+            item.parentId = null;
+        }
+
         if (item.color) meta.push(`COLOR:${item.color}`);
 
         let colC = meta.join("|");
@@ -1623,6 +1724,29 @@ if (btnColor) btnColor.onclick = () => {
 };
 
 if (btnLogout) btnLogout.onclick = handleLogout;
+if (btnLogoutHeader) btnLogoutHeader.onclick = handleLogout;
+
+// Avatar / Menu Logic
+if (userAvatar) {
+    userAvatar.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (userMenu) userMenu.classList.toggle('hidden');
+    });
+}
+if (userAvatarFallback) {
+    userAvatarFallback.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (userMenu) userMenu.classList.toggle('hidden');
+    });
+}
+// Close menu when clicking outside
+document.addEventListener('click', (e) => {
+    if (userMenu && !userMenu.classList.contains('hidden')) {
+        if (!userAvatar.contains(e.target) && !userMenu.contains(e.target) && !userAvatarFallback.contains(e.target)) {
+            userMenu.classList.add('hidden');
+        }
+    }
+});
 
 if (btnColorCancel) btnColorCancel.onclick = closeColorModal;
 if (colorModal) colorModal.onclick = (e) => {
