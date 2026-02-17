@@ -603,3 +603,25 @@ h1 {
     transform: translateY(1px);
     background: #222;
 }
+
+/* Make the header's right area flexible so the search input can grow
+   to occupy remaining horizontal space when visible. */
+header > div:last-child {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    justify-content: flex-end;
+    flex: 1 1 auto;
+}
+
+#search-container {
+    display: flex;
+    align-items: center;
+    flex: 1 1 auto;
+    max-width: none;
+}
+
+#search-container input {
+    width: 100% !important;
+    box-sizing: border-box;
+}

@@ -83,6 +83,12 @@
           </div>
         </div>
 
+        <!-- place refresh next to avatar so it's on same line -->
+        <button id="refresh-button" class="btn-icon hidden" title="Rafraîchir l'application" onclick="refreshApp()"
+          style="margin-left: 0.5rem;">
+          <i data-lucide="refresh-cw"></i>
+        </button>
+
       </div>
 
       <div style="display: flex; gap: 0.25rem; align-items: center;">
@@ -95,9 +101,7 @@
         <button id="filter-button" class="btn-icon hidden">
           <i data-lucide="filter"></i>
         </button>
-        <button id="refresh-button" class="btn-icon" title="Rafraîchir l'application" onclick="refreshApp()">
-          <i data-lucide="refresh-cw"></i>
-        </button>
+        
         <button id="settings-button" class="btn-icon">
           <i data-lucide="settings"></i>
         </button>
