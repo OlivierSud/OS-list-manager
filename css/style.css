@@ -530,6 +530,10 @@ h1 {
     cursor: default;
 }
 
+.list-header .item-text {
+    cursor: pointer;
+}
+
 /* Floating Action Button */
 .fab {
     position: fixed;

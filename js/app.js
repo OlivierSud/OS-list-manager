@@ -54,6 +54,15 @@ const DRAG_CONFIG = {
 };
 window.DRAG_CONFIG = DRAG_CONFIG;
 
+// Minimal transparent image used to suppress the browser's native drag image
+const _blankDragImage = (() => {
+    try {
+        const img = new Image();
+        img.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEUAAACnej3aAAAAAXRSTlMAQObYZgAAAApJREFUCNdjYAAAAAIAAeIhvDMAAAAASUVORK5CYII=';
+        return img;
+    } catch (e) { return null; }
+})();
+
 let autoScrollInterval = null;
 let autoScrollDirection = 0;
 
@@ -361,10 +370,23 @@ async function fetchSheetData() {
                         lastHeaderUid = uid;
                         isSubHeader = false;
                     } else {
+                        // Respect explicit metadata first: if STANDALONE flag is present, honor it.
+                        if (isStandalone) {
+                            // explicit standalone - leave pid null
+                            pid = null;
+                        } else if (pid) {
+                            // explicit PID provided in metadata - use it
+                            // keep pid as parsed
+                        } else if (lastHeaderUid) {
+                            // No explicit metadata: fall back to nearest previous header
+                            pid = lastHeaderUid;
+                        } else {
+                            // No header above and no metadata -> standalone
+                            isStandalone = true;
+                            pid = null;
+                        }
+                        // Ensure isSubHeader false for non-headers
                         isSubHeader = false;
-                        isStandalone = false;
-                        if (lastHeaderUid) pid = lastHeaderUid;
-                        else isStandalone = true;
                     }
 
                     if (rowIndex === 0) {
@@ -1065,7 +1087,7 @@ function renderList(listId) {
                             <i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i>
                         </span>
                         ${colorBullet}
-                        <span class="item-text" onclick="event.stopPropagation(); startInlineEdit(this, ${index})">${item.text}</span>
+                        <span class="item-text" onclick="event.stopPropagation(); toggleSection(${index})" ondblclick="event.stopPropagation(); startInlineEdit(this, ${index})">${item.text}</span>
                         <span class="section-count" style="margin-left: 0.5rem; font-size: 0.8rem; opacity: 0.8; font-weight: bold; color: var(--text-secondary);">(${itemCount})</span>
                     </div>
                     <div style="display: flex; gap: 0.25rem;">
@@ -1428,6 +1450,9 @@ function updateSectionColor(index, color) {
 
 function setupDragHandlers(element, index, isHeader) {
     element.addEventListener('dragstart', (e) => {
+        // Ensure any existing touch ghost from prior touch interactions is cleared
+        try { clearTouchGhost(); } catch (err) {}
+        touchDragging = false;
         draggedElement = element;
         draggedIndex = index;
         element.classList.add('dragging');
@@ -1467,6 +1492,12 @@ function setupDragHandlers(element, index, isHeader) {
                 allArrows.forEach(a => a.classList.add('collapsed'));
             });
         }
+        // Suppress the browser's native drag image which can linger visually
+        try {
+            if (e && e.dataTransfer && _blankDragImage) {
+                e.dataTransfer.setDragImage(_blankDragImage, 0, 0);
+            }
+        } catch (err) {}
     });
 
     element.addEventListener('dragend', (e) => {
@@ -1484,6 +1515,13 @@ function setupDragHandlers(element, index, isHeader) {
             if (tasksContainer) tasksContainer.style.touchAction = '';
             document.body.style.overflow = '';
         } catch (err) {}
+        // Ensure any touch ghost from mobile interaction is removed
+        try { clearTouchGhost(); } catch (e) {}
+        // Reset drag state to avoid lingering ghosts or references
+        touchDragging = false;
+        if (draggedElement) draggedElement.classList.remove('dragging');
+        draggedElement = null;
+        draggedIndex = null;
     });
 
     element.addEventListener('dragover', (e) => {
@@ -1991,6 +2029,10 @@ window.onload = function () {
 
         tasksContainer.addEventListener('drop', (e) => {
             stopAutoScroll();
+            try { clearTouchGhost(); } catch (e) {}
+            touchDragging = false;
+            draggedElement = null;
+            draggedIndex = null;
         });
     }
 
@@ -2000,7 +2042,18 @@ window.onload = function () {
         handleAutoScrollDuringDrag(e);
     });
     document.addEventListener('dragleave', () => stopAutoScroll());
-    document.addEventListener('drop', () => stopAutoScroll());
+    document.addEventListener('drop', (e) => { stopAutoScroll(); try { clearTouchGhost(); } catch (err) {} touchDragging = false; draggedElement = null; draggedIndex = null; });
+    document.addEventListener('dragend', (e) => { try { clearTouchGhost(); } catch (err) {} touchDragging = false; draggedElement = null; draggedIndex = null; stopAutoScroll(); });
+
+    // Extra safeguard: if a mousemove happens on desktop and a touch ghost remains (from hybrid flow), clear it.
+    document.addEventListener('mousemove', (e) => {
+        try {
+            if (typeof touchDragging === 'undefined' || touchDragging) return;
+            if (touchGhost) {
+                clearTouchGhost();
+            }
+        } catch (err) {}
+    });
 
     // Initialize history state for in-app navigation
     try {
@@ -2294,6 +2347,11 @@ window.onload = function () {
         clearTouchIndicator();
         renderList(listId);
         syncOrderToSheet(listId);
+        // Clean up any possible touch ghost left from hybrid interactions
+        try { clearTouchGhost(); } catch (e) {}
+        touchDragging = false;
+        draggedElement = null;
+        draggedIndex = null;
     }
 
     document.addEventListener('touchstart', (e) => {
