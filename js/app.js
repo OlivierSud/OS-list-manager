@@ -41,23 +41,29 @@ let collapsedSections = new Set(); // Track collapsed section indices
 let draggedElement = null;
 let draggedIndex = null;
 
-// Auto-scroll state for drag operations (used on mobile when near edges)
+// Drag / Auto-scroll configuration (adjust these values to tune behavior)
+// You can change them directly in code or at runtime via `window.DRAG_CONFIG`.
+const DRAG_CONFIG = {
+    AUTO_SCROLL_THRESHOLD: 300, // px from edge to start scrolling (increase for larger activation zone)
+    AUTO_SCROLL_STEP: 24 // px per tick
+};
+window.DRAG_CONFIG = DRAG_CONFIG;
+
 let autoScrollInterval = null;
 let autoScrollDirection = 0;
-const AUTO_SCROLL_THRESHOLD = 80; // px from edge to start scrolling
-const AUTO_SCROLL_STEP = 18; // px per tick
 
 function startAutoScroll(container, direction) {
     if (!container) return;
     if (autoScrollInterval && autoScrollDirection === direction) return;
     stopAutoScroll();
     autoScrollDirection = direction;
+    const step = (window.DRAG_CONFIG && window.DRAG_CONFIG.AUTO_SCROLL_STEP) || DRAG_CONFIG.AUTO_SCROLL_STEP;
     autoScrollInterval = setInterval(() => {
         try {
-            container.scrollBy({ top: direction * AUTO_SCROLL_STEP, left: 0, behavior: 'auto' });
+            container.scrollBy({ top: direction * step, left: 0, behavior: 'auto' });
         } catch (e) {
             // fallback
-            container.scrollTop += direction * AUTO_SCROLL_STEP;
+            container.scrollTop += direction * step;
         }
     }, 50);
 }
@@ -74,9 +80,10 @@ function handleAutoScrollDuringDrag(e) {
     if (!tasksContainer) return;
     const rect = tasksContainer.getBoundingClientRect();
     const y = e.clientY;
-    if (y < rect.top + AUTO_SCROLL_THRESHOLD) {
+    const threshold = (window.DRAG_CONFIG && window.DRAG_CONFIG.AUTO_SCROLL_THRESHOLD) || DRAG_CONFIG.AUTO_SCROLL_THRESHOLD;
+    if (y < rect.top + threshold) {
         startAutoScroll(tasksContainer, -1);
-    } else if (y > rect.bottom - AUTO_SCROLL_THRESHOLD) {
+    } else if (y > rect.bottom - threshold) {
         startAutoScroll(tasksContainer, 1);
     } else {
         stopAutoScroll();
@@ -275,113 +282,115 @@ async function fetchSheetData() {
 
         // Reset state with real data
         state.lists = [];
+        // Reset state with base list info (fast render)
+        state.lists = [];
         state.items = {};
 
-        // 2. Process each Sheet as a List
-        if (metaData.sheets) {
-            const fetchPromises = metaData.sheets.map(async (sheet, index) => {
+        if (metaData.sheets && metaData.sheets.length) {
+            // Build lightweight list entries so UI can render quickly
+            metaData.sheets.forEach((sheet, index) => {
                 const title = sheet.properties.title;
-                const sheetId = sheet.properties.sheetId; // Number
-
-                // 3. Fetch Items (include Column D for last modifier)
-                const dataResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(title)}!A:D`, {
-                    headers: { 'Authorization': `Bearer ${accessToken}` }
-                });
-                const data = await dataResponse.json();
-
-                // Load filter from Column C (cell C1)
-                let savedFilter = 'all';
-                if (data.values && data.values[0] && data.values[0][2]) {
-                    const configStr = data.values[0][2];
-                    if (configStr.startsWith('FILTER:')) {
-                        savedFilter = configStr.replace('FILTER:', '');
-                    }
-                }
-
-                // Add to Lists
-                const newList = {
+                const sheetId = sheet.properties.sheetId;
+                state.lists.push({
                     id: sheetId,
                     name: title,
                     color: COLOR_PALETTE[index % COLOR_PALETTE.length],
                     items: 0,
-                    filter: savedFilter
-                };
-
-                const items = [];
-                if (data.values) {
-                    let lastHeaderUid = null;
-                    data.values.forEach((row, rowIndex) => {
-                        const colC = row[2] || "";
-                        const isHeader = row[1] === "HEADER";
-
-                        // Parse Column C Metadata
-                        const parts = colC.split('|');
-                        let uid = parts.find(p => p.startsWith('UID:'))?.replace('UID:', '');
-                        let pid = parts.find(p => p.startsWith('PID:'))?.replace('PID:', '');
-                        let color = parts.find(p => p.startsWith('COLOR:'))?.replace('COLOR:', '');
-                        let sectionName = parts.find(p => p.startsWith('SECTION:'))?.replace('SECTION:', '');
-                        let isStandalone = parts.includes('STANDALONE');
-                        let isSubHeader = parts.includes('SUBHEADER');
-
-                        // Backward compatibility and inference
-                        // Treating all headers as Main Headers
-                        if (isHeader) {
-                            if (!uid) uid = generateId();
-                            lastHeaderUid = uid;
-                            isSubHeader = false; // FORCE FALSE
-                        } else {
-                            // It's a task.
-                            isSubHeader = false;
-                            isStandalone = false; // FORCE FALSE for simplification? 
-                            // Or keep standalone if strictly no header?
-                            // Let's keep logic: if no header seen yet, it's standalone.
-                            if (lastHeaderUid) {
-                                pid = lastHeaderUid;
-                            } else {
-                                isStandalone = true;
-                            }
-                        }
-
-                        // Extract filter from row 0 if present (FILTER: All|Active|Completed)
-                        const filterPart = parts.find(p => p.startsWith('FILTER:'));
-                        if (rowIndex === 0 && filterPart) {
-                            savedFilter = filterPart.replace('FILTER:', '');
-                        }
-
-                        items.push({
-                            id: uid || `${sheetId}-${rowIndex}-${generateId()}`,
-                            text: row[0],
-                            done: row[1] === "TRUE",
-                            isHeader: isHeader,
-                            isSubHeader: isSubHeader,
-                            isStandalone: isStandalone,
-                            parentId: isStandalone ? null : pid,
-                            color: color || null,
-                            sectionName: sectionName || null,
-                            lastModifier: row[3] || ""
-                        });
-                    });
-                }
-
-                newList.items = items.length;
-                state.items[sheetId] = items;
-                return newList;
+                    filter: 'all'
+                });
             });
 
-            const loadedLists = await Promise.all(fetchPromises);
-            state.lists = loadedLists;
+            // Render home early so user sees lists immediately
+            renderHome();
+
+            // Prepare ranges for batchGet to reduce network roundtrips
+            const ranges = metaData.sheets.map(s => `${s.properties.title}!A:D`);
+            const params = ranges.map(r => `ranges=${encodeURIComponent(r)}`).join('&');
+
+            const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:batchGet?${params}`;
+            const batchResponse = await fetch(batchUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+            const batchData = await batchResponse.json();
+
+            // Map results back to state.lists order
+            const valueRanges = (batchData && batchData.valueRanges) || [];
+            valueRanges.forEach((vr, idx) => {
+                const list = state.lists[idx];
+                const title = list.name;
+                const sheetId = list.id;
+
+                const dataValues = vr && vr.values ? vr.values : [];
+
+                // Parse filter if present in first row
+                let savedFilter = list.filter || 'all';
+                if (dataValues[0] && dataValues[0][2]) {
+                    const configStr = dataValues[0][2];
+                    if (configStr.startsWith('FILTER:')) savedFilter = configStr.replace('FILTER:', '');
+                }
+
+                const items = [];
+                let lastHeaderUid = null;
+                dataValues.forEach((row, rowIndex) => {
+                    const colC = row[2] || "";
+                    const isHeader = row[1] === "HEADER";
+
+                    const parts = colC.split('|');
+                    let uid = parts.find(p => p.startsWith('UID:'))?.replace('UID:', '');
+                    let pid = parts.find(p => p.startsWith('PID:'))?.replace('PID:', '');
+                    let color = parts.find(p => p.startsWith('COLOR:'))?.replace('COLOR:', '');
+                    let sectionName = parts.find(p => p.startsWith('SECTION:'))?.replace('SECTION:', '');
+                    let isStandalone = parts.includes('STANDALONE');
+                    let isSubHeader = parts.includes('SUBHEADER');
+
+                    if (isHeader) {
+                        if (!uid) uid = generateId();
+                        lastHeaderUid = uid;
+                        isSubHeader = false;
+                    } else {
+                        isSubHeader = false;
+                        isStandalone = false;
+                        if (lastHeaderUid) pid = lastHeaderUid;
+                        else isStandalone = true;
+                    }
+
+                    if (rowIndex === 0) {
+                        const filterPart = parts.find(p => p.startsWith('FILTER:'));
+                        if (filterPart) savedFilter = filterPart.replace('FILTER:', '');
+                    }
+
+                    items.push({
+                        id: uid || `${sheetId}-${rowIndex}-${generateId()}`,
+                        text: row[0],
+                        done: row[1] === "TRUE",
+                        isHeader: isHeader,
+                        isSubHeader: isSubHeader,
+                        isStandalone: isStandalone,
+                        parentId: isStandalone ? null : pid,
+                        color: color || null,
+                        sectionName: sectionName || null,
+                        lastModifier: row[3] || ""
+                    });
+                });
+
+                list.items = items.length;
+                list.filter = savedFilter;
+                state.items[sheetId] = items;
+            });
+
+            // Update colors from metadata and re-render with full data
+            await loadListColors();
+            renderHome();
+        } else {
+            // No sheets
+            renderHome();
         }
 
-        // Load colors from sheet metadata if available
-        await loadListColors();
-
         console.log("Data sync complete:", state);
-        renderHome();
     } catch (e) {
         console.error("Network or API Error", e);
     }
 }
 
+// Create a new sheet (list)
 async function createListInSheet(name) {
     if (!accessToken) return;
 
@@ -1134,6 +1143,17 @@ function openList(id) {
     state.activeListId = id;
     state.view = 'list';
     renderList(id);
+    // push history state for this list view
+    pushAppState({ app: 'oslist', view: 'list', id: id });
+}
+
+// Push history state when navigating within the app so browser back stays inside the app
+function pushAppState(stateObj) {
+    try {
+        history.pushState(stateObj, '', '');
+    } catch (e) {
+        // ignore
+    }
 }
 
 function deleteListItem(index) {
@@ -1195,6 +1215,8 @@ function goHome() {
         searchInput.style.width = '100px';
     }
     renderHome();
+    // push home state so browser back returns here first
+    pushAppState({ app: 'oslist', view: 'home' });
 }
 
 function toggleItem(itemId) {
@@ -1719,7 +1741,7 @@ async function syncOrderToSheet(listId) {
 
 // --- Event Listeners ---
 
-if (backButton) backButton.addEventListener('click', goHome);
+if (backButton) backButton.addEventListener('click', (e) => { if (e && e.preventDefault) e.preventDefault(); e.stopPropagation(); goHome(); });
 
 if (addTaskButton) addTaskButton.addEventListener('click', (e) => {
     e.preventDefault();
@@ -1868,4 +1890,52 @@ window.onload = function () {
     if (settingsButton) {
         settingsButton.classList.add('hidden');
     }
+
+    // --- Global drag listeners to support auto-scroll on desktop (PC) ---
+    if (tasksContainer) {
+        // While dragging, ensure container-level dragover triggers auto-scroll even when not over an item
+        tasksContainer.addEventListener('dragover', (e) => {
+            if (!draggedElement) return;
+            handleAutoScrollDuringDrag(e);
+        });
+
+        tasksContainer.addEventListener('dragleave', (e) => {
+            stopAutoScroll();
+        });
+
+        tasksContainer.addEventListener('drop', (e) => {
+            stopAutoScroll();
+        });
+    }
+
+    // Document-level handlers to catch drag movements outside item elements on PC
+    document.addEventListener('dragover', (e) => {
+        if (!draggedElement) return;
+        handleAutoScrollDuringDrag(e);
+    });
+    document.addEventListener('dragleave', () => stopAutoScroll());
+    document.addEventListener('drop', () => stopAutoScroll());
+
+    // Initialize history state for in-app navigation
+    try {
+        history.replaceState({ app: 'oslist', view: 'home' }, '', '');
+    } catch (e) {}
+
+    window.addEventListener('popstate', (e) => {
+        const s = e.state;
+        if (!s || s.app !== 'oslist') {
+            // If popstate is not ours, force app to home and push an app state to keep user inside
+            goHome();
+            try { history.pushState({ app: 'oslist', view: 'home' }, '', ''); } catch (err) {}
+            return;
+        }
+
+        if (s.view === 'home') goHome();
+        else if (s.view === 'list') {
+            // avoid double-push since openList also pushes
+            state.activeListId = s.id;
+            state.view = 'list';
+            renderList(s.id);
+        }
+    });
 };
