@@ -1982,6 +1982,126 @@ window.onload = function () {
         } catch (err) {}
     }
 
+    // Touch drop indicator state
+    let currentTouchDrop = null;
+
+    function findDropAtPoint(x, y) {
+        const el = document.elementFromPoint(x, y);
+        if (!el) return null;
+        const spacer = el.closest && el.closest('.drop-zone-spacer');
+        if (spacer && spacer.dataset && spacer.dataset.dropTargetIndex !== undefined) {
+            return { type: 'spacer', index: parseInt(spacer.dataset.dropTargetIndex), element: spacer };
+        }
+        const itemEl = el.closest && el.closest('[data-index]');
+        if (itemEl) {
+            const rect = itemEl.getBoundingClientRect();
+            const relY = y - rect.top;
+            const insertAfter = relY >= (rect.height / 2);
+            return { type: 'item', index: parseInt(itemEl.dataset.index), element: itemEl, insertAfter };
+        }
+        return null;
+    }
+
+    function clearTouchIndicator() {
+        if (!currentTouchDrop) return;
+        try {
+            if (currentTouchDrop.type === 'spacer') currentTouchDrop.element.classList.remove('drag-over-boundary');
+            else if (currentTouchDrop.type === 'item') {
+                currentTouchDrop.element.classList.remove('drag-over-top');
+                currentTouchDrop.element.classList.remove('drag-over-bottom');
+            }
+        } catch (e) {}
+        currentTouchDrop = null;
+    }
+
+    function showTouchIndicator(info) {
+        clearTouchIndicator();
+        if (!info) return;
+        try {
+            if (info.type === 'spacer') info.element.classList.add('drag-over-boundary');
+            else if (info.type === 'item') {
+                if (info.insertAfter) info.element.classList.add('drag-over-bottom');
+                else info.element.classList.add('drag-over-top');
+            }
+            currentTouchDrop = info;
+        } catch (e) {}
+    }
+
+    async function performTouchDrop() {
+        if (!currentTouchDrop) return;
+        const listId = state.activeListId;
+        if (listId === null || listId === undefined) return;
+        const items = [...state.items[listId]];
+        const dragIndex = draggedIndex;
+        if (dragIndex === null || dragIndex === undefined) return;
+
+        const movedItem = items[dragIndex];
+
+        if (movedItem.isHeader) {
+            // Only allow header moves on spacers
+            if (currentTouchDrop.type !== 'spacer') {
+                clearTouchIndicator();
+                return;
+            }
+
+            // collect header block
+            const sectionToMove = [];
+            let i = dragIndex;
+            const movingHeader = items[i++];
+            sectionToMove.push(movingHeader);
+            if (!movingHeader.isSubHeader) {
+                while (i < items.length) {
+                    const current = items[i];
+                    if ((current.isHeader && !current.isSubHeader) || current.isStandalone) break;
+                    sectionToMove.push(items[i++]);
+                }
+            } else {
+                while (i < items.length) {
+                    const current = items[i];
+                    if (current.isHeader) break;
+                    sectionToMove.push(items[i++]);
+                }
+            }
+
+            // Remove block
+            items.splice(dragIndex, sectionToMove.length);
+
+            let targetIndex = currentTouchDrop.index;
+            if (dragIndex < targetIndex) targetIndex -= sectionToMove.length;
+            items.splice(targetIndex, 0, ...sectionToMove);
+
+        } else {
+            // item move
+            let targetIndex = currentTouchDrop.index;
+            if (currentTouchDrop.type === 'item') {
+                if (currentTouchDrop.insertAfter) targetIndex++;
+            }
+
+            // adjust for removal
+            if (dragIndex < targetIndex) targetIndex--;
+
+            // remove and insert
+            items.splice(dragIndex, 1);
+            items.splice(targetIndex, 0, movedItem);
+
+            // Update parentId similar to drop handler
+            const targetEl = (currentTouchDrop.type === 'item') ? items[targetIndex] : null;
+            if (targetEl) {
+                // when dropped on an item, adopt its parent
+                movedItem.parentId = targetEl.parentId;
+                movedItem.isStandalone = targetEl.isStandalone;
+            } else {
+                movedItem.parentId = null;
+                movedItem.isStandalone = true;
+            }
+        }
+
+        state.items[listId] = items;
+        clearTouchIndicator();
+        renderList(listId);
+        syncOrderToSheet(listId);
+    }
+
     document.addEventListener('touchstart', (e) => {
         if (!e.touches || !e.touches[0]) return;
         const t = e.touches[0];
@@ -2008,6 +2128,9 @@ window.onload = function () {
         const touch = e.touches[0];
         if (e.cancelable) e.preventDefault();
         handleAutoScrollDuringDrag({ clientY: touch.clientY });
+        // Find drop target and show indicator
+        const info = findDropAtPoint(touch.clientX, touch.clientY);
+        showTouchIndicator(info);
     }, { passive: false });
 
     function endTouchDrag() {
@@ -2022,7 +2145,7 @@ window.onload = function () {
         draggedIndex = null;
     }
 
-    document.addEventListener('touchend', (e) => { endTouchDrag(); }, { passive: true });
+    document.addEventListener('touchend', async (e) => { await performTouchDrop(); endTouchDrag(); }, { passive: true });
     document.addEventListener('touchcancel', (e) => { endTouchDrag(); }, { passive: true });
 
     // Pointer fallback for PWAs/Android: use pointer long-press
