@@ -1081,13 +1081,13 @@ function renderList(listId) {
                 const colorBullet = `<span class="section-bullet" style="background: ${bulletColor};" onclick="event.stopPropagation(); window.openSectionColor(${index});"></span>`;
 
                 el.innerHTML = `
-                    <div style="display: flex; align-items: center; flex: 1;">
-                        <span class="drag-handle"><i data-lucide="grip-vertical" style="width: 16px; height: 16px;"></i></span>
-                        <span class="collapse-arrow ${arrowClass}" data-section-index="${index}">
-                            <i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i>
-                        </span>
-                        ${colorBullet}
-                        <span class="item-text" onclick="event.stopPropagation(); toggleSection(${index})" ondblclick="event.stopPropagation(); startInlineEdit(this, ${index})">${item.text}</span>
+                    <div style="display: flex; align-items: center; flex: 1;" onclick="event.stopPropagation(); toggleSection(${index})">
+                            <span class="drag-handle" onclick="event.stopPropagation();"><i data-lucide="grip-vertical" style="width: 16px; height: 16px;"></i></span>
+                            <span class="collapse-arrow ${arrowClass}" data-section-index="${index}">
+                                <i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i>
+                            </span>
+                            ${colorBullet}
+                            <span class="item-text" onclick="event.stopPropagation(); startInlineEdit(this, ${index})">${item.text}</span>
                         <span class="section-count" style="margin-left: 0.5rem; font-size: 0.8rem; opacity: 0.8; font-weight: bold; color: var(--text-secondary);">(${itemCount})</span>
                     </div>
                     <div style="display: flex; gap: 0.25rem;">
