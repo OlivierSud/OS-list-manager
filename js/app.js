@@ -41,6 +41,48 @@ let collapsedSections = new Set(); // Track collapsed section indices
 let draggedElement = null;
 let draggedIndex = null;
 
+// Auto-scroll state for drag operations (used on mobile when near edges)
+let autoScrollInterval = null;
+let autoScrollDirection = 0;
+const AUTO_SCROLL_THRESHOLD = 80; // px from edge to start scrolling
+const AUTO_SCROLL_STEP = 18; // px per tick
+
+function startAutoScroll(container, direction) {
+    if (!container) return;
+    if (autoScrollInterval && autoScrollDirection === direction) return;
+    stopAutoScroll();
+    autoScrollDirection = direction;
+    autoScrollInterval = setInterval(() => {
+        try {
+            container.scrollBy({ top: direction * AUTO_SCROLL_STEP, left: 0, behavior: 'auto' });
+        } catch (e) {
+            // fallback
+            container.scrollTop += direction * AUTO_SCROLL_STEP;
+        }
+    }, 50);
+}
+
+function stopAutoScroll() {
+    if (autoScrollInterval) {
+        clearInterval(autoScrollInterval);
+        autoScrollInterval = null;
+        autoScrollDirection = 0;
+    }
+}
+
+function handleAutoScrollDuringDrag(e) {
+    if (!tasksContainer) return;
+    const rect = tasksContainer.getBoundingClientRect();
+    const y = e.clientY;
+    if (y < rect.top + AUTO_SCROLL_THRESHOLD) {
+        startAutoScroll(tasksContainer, -1);
+    } else if (y > rect.bottom - AUTO_SCROLL_THRESHOLD) {
+        startAutoScroll(tasksContainer, 1);
+    } else {
+        stopAutoScroll();
+    }
+}
+
 // Color palette for lists
 const COLOR_PALETTE = [
     '#eb7600', // Blender Orange
@@ -277,6 +319,7 @@ async function fetchSheetData() {
                         let uid = parts.find(p => p.startsWith('UID:'))?.replace('UID:', '');
                         let pid = parts.find(p => p.startsWith('PID:'))?.replace('PID:', '');
                         let color = parts.find(p => p.startsWith('COLOR:'))?.replace('COLOR:', '');
+                        let sectionName = parts.find(p => p.startsWith('SECTION:'))?.replace('SECTION:', '');
                         let isStandalone = parts.includes('STANDALONE');
                         let isSubHeader = parts.includes('SUBHEADER');
 
@@ -314,6 +357,7 @@ async function fetchSheetData() {
                             isStandalone: isStandalone,
                             parentId: isStandalone ? null : pid,
                             color: color || null,
+                            sectionName: sectionName || null,
                             lastModifier: row[3] || ""
                         });
                     });
@@ -417,7 +461,7 @@ async function toggleItemInSheet(listId, itemId, newStatus) {
 
     // Row index in sheet is 1-based usually for A1 notation, but values array is 0-based.
     // A1 notation: Sheet!B{rowIndex+1}:D{rowIndex+1}
-    const range = `${list.name}!B${rowIndex + 1}:D${rowIndex + 1}`;
+        const range = `${list.name}!A${rowIndex + 1}:D${rowIndex + 1}`;
 
     try {
         // Prevent toggling headers if somehow triggered
@@ -859,7 +903,7 @@ function renderList(listId) {
         const topDropZone = document.createElement('div');
         topDropZone.className = 'drop-zone-spacer';
         topDropZone.dataset.dropTargetIndex = 0;
-        topDropZone.innerText = "Sortir de la section (Haut)";
+        topDropZone.innerText = "Placer l'élément ici";
         setupBoundaryDragHandlers(topDropZone, 'top');
         tasksContainer.appendChild(topDropZone);
 
@@ -874,7 +918,7 @@ function renderList(listId) {
                 const zone = document.createElement('div');
                 zone.className = 'drop-zone-spacer';
                 zone.dataset.dropTargetIndex = index;
-                zone.innerText = "Sortir de la section";
+                zone.innerText = "Placer l'élément ici";
                 setupBoundaryDragHandlers(zone, 'middle');
                 tasksContainer.appendChild(zone);
             }
@@ -1076,7 +1120,7 @@ function renderList(listId) {
         const bottomZone = document.createElement('div');
         bottomZone.className = 'drop-zone-spacer';
         bottomZone.dataset.dropTargetIndex = currentItems.length;
-        bottomZone.innerText = "Sortir de la section (Bas)";
+        bottomZone.innerText = "Placer l'élément ici";
         setupBoundaryDragHandlers(bottomZone, 'bottom');
         tasksContainer.appendChild(bottomZone);
     }
@@ -1355,9 +1399,20 @@ function setupDragHandlers(element, index, isHeader) {
             el.classList.remove('drag-over-top');
             el.classList.remove('drag-over-bottom');
         });
+        stopAutoScroll();
     });
 
     element.addEventListener('dragover', (e) => {
+        const draggingHeader = draggedElement && draggedElement.dataset && draggedElement.dataset.isHeader === 'true';
+
+        // Always handle auto-scroll while dragging (both items and headers)
+        handleAutoScrollDuringDrag(e);
+
+        // If a section (header) is being dragged, do not show placement lines
+        if (draggingHeader) {
+            return; // only boundary spacers accept section drops; auto-scroll handled above
+        }
+
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
 
@@ -1371,15 +1426,9 @@ function setupDragHandlers(element, index, isHeader) {
 
             if (element.dataset.isHeader === 'true' && draggedElement.dataset.isHeader === 'false') {
                 // Dragging Item ON Header
-                // If top half -> Insert BEFORE header (sibling)
-                // If bottom half -> Insert INTO header (child)
                 if (isTop) {
                     element.classList.add('drag-over-top');
                 } else {
-                    // Use header style for nesting feedback to be distinct? 
-                    // User asked for "orange line below". Let's stick to consistent line feedback.
-                    // But changing style might be better for "nesting". 
-                    // Let's use the line for exact positioning.
                     element.classList.add('drag-over-bottom');
                 }
             } else {
@@ -1395,6 +1444,7 @@ function setupDragHandlers(element, index, isHeader) {
 
     element.addEventListener('dragleave', (e) => {
         element.classList.remove('drag-over', 'drag-over-header', 'drag-over-top', 'drag-over-bottom');
+        stopAutoScroll();
     });
 
     element.addEventListener('drop', (e) => {
@@ -1432,7 +1482,7 @@ function setupDragHandlers(element, index, isHeader) {
         // Logic split: Moving Section vs Moving Item
         if (movedItem.isHeader) {
             // -- SECTION MOVE --
-            // We grab the whole section
+            // Collect the header and its contiguous children as a block.
             const sectionToMove = [];
             let i = dragIndex;
 
@@ -1440,46 +1490,38 @@ function setupDragHandlers(element, index, isHeader) {
             const movingHeader = items[i++];
             sectionToMove.push(movingHeader);
 
-            // Collect all items until the next header OR standalone item
-            while (i < items.length) {
-                const current = items[i];
-                if (current.isHeader || current.isStandalone) break;
-                sectionToMove.push(items[i++]);
+            // Collect children depending on header depth.
+            if (!movingHeader.isSubHeader) {
+                // Main header: include everything until the next main header or a standalone item.
+                while (i < items.length) {
+                    const current = items[i];
+                    if ((current.isHeader && !current.isSubHeader) || current.isStandalone) break;
+                    sectionToMove.push(items[i++]);
+                }
+            } else {
+                // Sub-header: include until the next header (sub or main).
+                while (i < items.length) {
+                    const current = items[i];
+                    if (current.isHeader) break;
+                    sectionToMove.push(items[i++]);
+                }
             }
 
             // Safety: Don't drop inside yourself
             if (dropIndex >= dragIndex && dropIndex < dragIndex + sectionToMove.length) return;
 
-            // Remove logic
+            // Remove the block from the array
             items.splice(dragIndex, sectionToMove.length);
 
-            // Re-calculate target index because we might have removed MORE than 1 item
-            // Original targetIndex calc assumed 1 item removal.
-            // Let's restart index calc for Header specific case to be safe.
+            // Recalculate real target index and insert the whole block intact
             let realTargetIndex = dropIndex;
             if (insertAfter) realTargetIndex++;
-
             if (dragIndex < realTargetIndex) {
                 realTargetIndex -= sectionToMove.length;
             }
-
-            // Insert logic
             items.splice(realTargetIndex, 0, ...sectionToMove);
 
-            // Parent ID update for Header (Nesting)
-            // We look at who we dropped onto or near.
-            // But relying on "dropIndex" item properties is safest before splice.
-            // Let's check the New Neighbors in `items`?
-            // Or use the `dropIndex` element's properties.
-
-            // Flatten logic: All headers are root
-            sectionToMove[0].isSubHeader = false;
-            sectionToMove[0].parentId = null;
-
-            // Update children parentId
-            sectionToMove.forEach(it => {
-                if (!it.isHeader) it.parentId = sectionToMove[0].id;
-            });
+            // Do NOT forcibly change header/subheader flags or parentId here; keep original structure
 
         } else {
             // -- ITEM MOVE --
@@ -1510,6 +1552,7 @@ function setupDragHandlers(element, index, isHeader) {
         state.items[listId] = items;
         renderList(listId);
         syncOrderToSheet(listId);
+        stopAutoScroll();
     });
 }
 
@@ -1518,6 +1561,8 @@ function setupBoundaryDragHandlers(element, position) {
 
     element.addEventListener('dragover', (e) => {
         if (!draggedElement) return;
+        // Auto-scroll while dragging
+        handleAutoScrollDuringDrag(e);
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         element.classList.add('drag-over-boundary');
@@ -1525,12 +1570,15 @@ function setupBoundaryDragHandlers(element, position) {
 
     element.addEventListener('dragleave', () => {
         element.classList.remove('drag-over-boundary');
+        stopAutoScroll();
     });
 
     element.addEventListener('drop', (e) => {
         if (!draggedElement) return;
         e.preventDefault();
         element.classList.remove('drag-over-boundary');
+
+        stopAutoScroll();
 
         const listId = state.activeListId;
         const dragIndex = draggedIndex;
@@ -1545,21 +1593,24 @@ function setupBoundaryDragHandlers(element, position) {
             const movingHeader = items[i++];
             itemsToMove.push(movingHeader);
 
-            // Collect until next header OR standalone item
-            while (i < items.length) {
-                const current = items[i];
-                if (current.isHeader || current.isStandalone) break;
-                itemsToMove.push(items[i++]);
+            if (!movingHeader.isSubHeader) {
+                // Main header: include everything until the next main header or standalone
+                while (i < items.length) {
+                    const current = items[i];
+                    if ((current.isHeader && !current.isSubHeader) || current.isStandalone) break;
+                    itemsToMove.push(items[i++]);
+                }
+            } else {
+                // Sub-header: include until the next header
+                while (i < items.length) {
+                    const current = items[i];
+                    if (current.isHeader) break;
+                    itemsToMove.push(items[i++]);
+                }
             }
-            items.splice(dragIndex, itemsToMove.length);
-            itemsToMove[0].isSubHeader = false;
-            itemsToMove[0].isStandalone = false;
-            itemsToMove[0].parentId = null;
 
-            // Update children parentId
-            itemsToMove.forEach(it => {
-                if (!it.isHeader) it.parentId = itemsToMove[0].id;
-            });
+            items.splice(dragIndex, itemsToMove.length);
+            // Preserve original header/subheader flags and parent relationships; do not force flattening
         } else {
             const [item] = items.splice(dragIndex, 1);
             item.isStandalone = true;
@@ -1597,47 +1648,52 @@ async function syncOrderToSheet(listId) {
     if (!list) return;
 
     const items = state.items[listId];
-    const values = items.map((item, idx) => {
-        let meta = [];
-        if (item.isStandalone) meta.push("STANDALONE");
-        // REMOVED SUBHEADER
-        if (item.isHeader && item.id) meta.push(`UID:${item.id}`);
-        // We recalculate PID strictly based on current position!
-        // Find closest preceding header
-        let currentHeaderId = null;
-        for (let i = idx - 1; i >= 0; i--) {
-            if (items[i].isHeader) {
-                currentHeaderId = items[i].id;
-                break;
-            }
-        }
+        const values = items.map((item, idx) => {
+            let meta = [];
+            if (item.isStandalone) meta.push("STANDALONE");
+            if (item.isHeader && item.id) meta.push(`UID:${item.id}`);
 
-        if (!item.isHeader) {
-            // Task: Set PID to currentHeaderId, UNLESS it's explicitly standalone
-            if (!item.isStandalone) {
-                item.parentId = currentHeaderId;
+            // Recalculate closest preceding header for PID/SECTION
+            let currentHeaderId = null;
+            for (let i = idx - 1; i >= 0; i--) {
+                if (items[i].isHeader) {
+                    currentHeaderId = items[i].id;
+                    break;
+                }
+            }
+
+            if (!item.isHeader) {
+                if (!item.isStandalone) {
+                    item.parentId = currentHeaderId;
+                } else {
+                    item.parentId = null;
+                }
+                if (item.parentId) meta.push(`PID:${item.parentId}`);
+
+                // Add explicit SECTION name metadata to make ownership clear in Sheets
+                const parentHeader = items.find(h => h.isHeader && h.id === item.parentId);
+                if (parentHeader && parentHeader.text) {
+                    // Replace any pipe chars to avoid breaking our meta format
+                    const safeName = parentHeader.text.replace(/\|/g, ' ');
+                    meta.push(`SECTION:${safeName}`);
+                }
             } else {
                 item.parentId = null;
             }
-            if (item.parentId) meta.push(`PID:${item.parentId}`);
-        } else {
-            // Header: Is always root now. No PID.
-            item.parentId = null;
-        }
 
-        if (item.color) meta.push(`COLOR:${item.color}`);
+            if (item.color) meta.push(`COLOR:${item.color}`);
 
-        let colC = meta.join("|");
-        if (idx === 0) {
-            colC = `FILTER:${list.filter}${colC ? "|" + colC : ""}`;
-        }
-        return [
-            item.text,
-            item.isHeader ? 'HEADER' : (item.done ? 'TRUE' : 'FALSE'),
-            colC,
-            item.lastModifier || ""
-        ];
-    });
+            let colC = meta.join("|");
+            if (idx === 0) {
+                colC = `FILTER:${list.filter}${colC ? "|" + colC : ""}`;
+            }
+            return [
+                item.text,
+                item.isHeader ? 'HEADER' : (item.done ? 'TRUE' : 'FALSE'),
+                colC,
+                item.lastModifier || ""
+            ];
+        });
 
     try {
         // Clear and rewrite the entire sheet A:D
