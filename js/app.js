@@ -1396,6 +1396,12 @@ function setupDragHandlers(element, index, isHeader) {
         tasksContainer.classList.add('dragging-active'); // Show all spacers
         e.dataTransfer.effectAllowed = 'move';
 
+        // Prevent native touch scrolling while dragging so our auto-scroll can run
+        try {
+            if (tasksContainer) tasksContainer.style.touchAction = 'none';
+            document.body.style.overflow = 'hidden';
+        } catch (err) {}
+
         // If dragging a header, collapse ALL sections to prevent dropping inside them
         // This simplifies the structure to a flat list of headers + collapsed items
         if (isHeader) {
@@ -1436,6 +1442,10 @@ function setupDragHandlers(element, index, isHeader) {
             el.classList.remove('drag-over-bottom');
         });
         stopAutoScroll();
+        try {
+            if (tasksContainer) tasksContainer.style.touchAction = '';
+            document.body.style.overflow = '';
+        } catch (err) {}
     });
 
     element.addEventListener('dragover', (e) => {
@@ -1966,6 +1976,8 @@ window.onload = function () {
                     touchDragging = true;
                     el.classList.add('dragging');
                     if (tasksContainer) tasksContainer.classList.add('dragging-active');
+                    // Prevent native touch scroll while in drag mode
+                    try { if (tasksContainer) tasksContainer.style.touchAction = 'none'; document.body.style.overflow = 'hidden'; } catch (err) {}
                 }
             }
         } catch (err) {}
@@ -1988,6 +2000,8 @@ window.onload = function () {
         draggedElement = null;
         draggedIndex = null;
     });
+    // restore touch-action and body overflow after touch ends
+    document.addEventListener('touchend', () => { try { if (tasksContainer) tasksContainer.style.touchAction = ''; document.body.style.overflow = ''; } catch (err) {} }, { passive: true });
 
     document.addEventListener('touchcancel', () => {
         if (!touchDragging) return;
@@ -2011,6 +2025,7 @@ window.onload = function () {
                 pointerDragging = true;
                 el.classList.add('dragging');
                 if (tasksContainer) tasksContainer.classList.add('dragging-active');
+                try { if (tasksContainer) tasksContainer.style.touchAction = 'none'; document.body.style.overflow = 'hidden'; } catch (err) {}
             }
         } catch (err) {}
     }, { passive: true });
@@ -2030,4 +2045,6 @@ window.onload = function () {
         draggedElement = null;
         draggedIndex = null;
     });
+    // restore touchAction on pointer up (in case pointer events used)
+    document.addEventListener('pointerup', (e) => { try { if (tasksContainer) tasksContainer.style.touchAction = ''; document.body.style.overflow = ''; } catch (err) {} }, { passive: true });
 };
