@@ -534,6 +534,28 @@ h1 {
     cursor: pointer;
 }
 
+/* Edit (pencil) button: hide by default and show on header hover (desktop),
+   but always show on touch devices where hover isn't available. */
+.list-header .btn-icon-small {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    transform: translateY(0);
+    margin-left: 0.5rem;
+}
+.list-header:hover .btn-icon-small {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Touch devices: make the edit button always visible */
+@media (hover: none) {
+    .list-header .btn-icon-small {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+
 /* Floating Action Button */
 .fab {
     position: fixed;

@@ -1087,8 +1087,11 @@ function renderList(listId) {
                                 <i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i>
                             </span>
                             ${colorBullet}
-                            <span class="item-text" onclick="event.stopPropagation(); startInlineEdit(this, ${index})">${item.text}</span>
-                        <span class="section-count" style="margin-left: 0.5rem; font-size: 0.8rem; opacity: 0.8; font-weight: bold; color: var(--text-secondary);">(${itemCount})</span>
+                            <span class="item-text">${item.text}</span>
+                            <span class="section-count" style="margin-left: 0.5rem; font-size: 0.8rem; opacity: 0.8; font-weight: bold; color: var(--text-secondary);">(${itemCount})</span>
+                            <button class="btn-icon-small" title="Éditer le titre" onclick="event.stopPropagation(); startInlineEdit(this.closest('.list-header').querySelector('.item-text'), ${index})">
+                                <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
+                            </button>
                     </div>
                     <div style="display: flex; gap: 0.25rem;">
                         <button class="btn-delete-item" onclick="event.stopPropagation(); deleteListItem(${index})">
