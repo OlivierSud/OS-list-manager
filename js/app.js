@@ -1998,4 +1998,36 @@ window.onload = function () {
         draggedElement = null;
         draggedIndex = null;
     });
+
+    // Pointer events fallback (better support in PWAs on Android)
+    let pointerDragging = false;
+    document.addEventListener('pointerdown', (e) => {
+        if (e.pointerType !== 'touch') return;
+        try {
+            const el = e.target.closest && e.target.closest('[draggable]');
+            if (el) {
+                draggedElement = el;
+                draggedIndex = parseInt(el.dataset.index);
+                pointerDragging = true;
+                el.classList.add('dragging');
+                if (tasksContainer) tasksContainer.classList.add('dragging-active');
+            }
+        } catch (err) {}
+    }, { passive: true });
+
+    document.addEventListener('pointermove', (e) => {
+        if (!pointerDragging) return;
+        if (e.clientY === undefined) return;
+        handleAutoScrollDuringDrag(e);
+    }, { passive: true });
+
+    document.addEventListener('pointerup', (e) => {
+        if (!pointerDragging) return;
+        pointerDragging = false;
+        stopAutoScroll();
+        if (draggedElement) draggedElement.classList.remove('dragging');
+        if (tasksContainer) tasksContainer.classList.remove('dragging-active');
+        draggedElement = null;
+        draggedIndex = null;
+    });
 };
