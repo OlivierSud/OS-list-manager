@@ -1707,6 +1707,7 @@ function setupDragHandlers(element, index, isHeader) {
                 touchStartX = t.clientX; touchStartY = t.clientY;
                 e.stopPropagation();
                 e.preventDefault();
+                if ("vibrate" in navigator) navigator.vibrate(50);
                 beginDragFromTarget(handle);
             }, { passive: false });
 
@@ -1714,6 +1715,7 @@ function setupDragHandlers(element, index, isHeader) {
                 if (e.pointerType === 'touch') {
                     touchStartX = e.clientX; touchStartY = e.clientY;
                     e.stopPropagation();
+                    if ("vibrate" in navigator) navigator.vibrate(50);
                     beginDragFromTarget(handle);
                 }
             }, { passive: false });
@@ -2360,17 +2362,7 @@ window.onload = function () {
         touchStartX = t.clientX; touchStartY = t.clientY;
         const target = e.target;
 
-        // Long-press feedback for mobile
-        if (touchLongPressTimer) clearTimeout(touchLongPressTimer);
-        touchLongPressTimer = setTimeout(() => {
-            const el = target.closest && target.closest('[draggable]');
-            if (el && !touchDragging) {
-                // Removed redundant vibration here as beginDragFromTarget (called inside) doesn't have it, 
-                // but let's keep it minimal or remove if causing issues. User asked to remove re-vibration.
-                // if ("vibrate" in navigator) navigator.vibrate(50); 
-                beginDragFromTarget(target);
-            }
-        }, LONG_PRESS_MS);
+
     }, { passive: true });
 
     document.addEventListener('touchmove', (e) => {
