@@ -2431,8 +2431,16 @@ window.onload = function () {
         document.addEventListener('pointerdown', (e) => {
             if (e.pointerType !== 'touch' && e.pointerType !== 'pen' && e.pointerType !== 'mouse') return;
             pointerStartX = e.clientX; pointerStartY = e.clientY;
+            // Sync with global touch coordinates for beginDragFromTarget
+            touchStartX = e.clientX; touchStartY = e.clientY;
             const target = e.target;
-            pointerLongPressTimer = setTimeout(() => beginDragFromTarget(target), LONG_PRESS_MS);
+            pointerLongPressTimer = setTimeout(() => {
+                const el = target.closest && target.closest('[draggable]');
+                if (el) {
+                    if ("vibrate" in navigator) navigator.vibrate(50);
+                    beginDragFromTarget(target);
+                }
+            }, LONG_PRESS_MS);
         }, { passive: false });
 
         document.addEventListener('pointermove', (e) => {

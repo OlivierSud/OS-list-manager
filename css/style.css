@@ -427,8 +427,13 @@ h1 {
 
 /* Dragging State */
 .dragging {
-    opacity: 0.5;
-    background: var(--bg-dark) !important;
+    opacity: 0.8 !important;
+    background: var(--bg-secondary) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+    transform: scale(1.02) !important;
+    z-index: 1000 !important;
+    border: 1px solid var(--accent-color) !important;
+    cursor: grabbing !important;
 }
 
 .drag-over {
@@ -666,10 +671,11 @@ header>div:last-child {
     width: 100% !important;
     box-sizing: border-box;
 }
+
 .touch-ghost {
     background: var(--bg-secondary) !important;
     border: 2px solid var(--accent-color) !important;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.6) !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6) !important;
     transform: scale(1.05) !important;
     transition: transform 0.1s ease !important;
     z-index: 10000 !important;
