@@ -74,6 +74,7 @@ main {
 #tasks-container, #lists-container {
     touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
 }
 
 /* Utilities */

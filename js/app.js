@@ -1481,7 +1481,7 @@ function setupDragHandlers(element, index, isHeader) {
         // Prevent native touch scrolling while dragging so our auto-scroll can run
         try {
             if (tasksContainer) tasksContainer.style.touchAction = 'none';
-            document.body.style.overflow = 'hidden';
+            // Avoid toggling document.body overflow globally — leave body scrolling untouched
         } catch (err) {}
 
         // If dragging a header, collapse ALL sections to prevent dropping inside them
@@ -2122,7 +2122,7 @@ window.onload = function () {
             touchDragging = true;
             el.classList.add('dragging');
             if (tasksContainer) tasksContainer.classList.add('dragging-active');
-            try { if (tasksContainer) tasksContainer.style.touchAction = 'none'; document.body.style.overflow = 'hidden'; } catch (err) {}
+            try { if (tasksContainer) tasksContainer.style.touchAction = 'none'; } catch (err) {}
             // create floating ghost to follow finger for better UX on mobile
             try { createTouchGhost(el, touchStartX, touchStartY); } catch (e) {}
             
@@ -2383,7 +2383,7 @@ window.onload = function () {
         stopAutoScroll();
         if (draggedElement) draggedElement.classList.remove('dragging');
         if (tasksContainer) tasksContainer.classList.remove('dragging-active');
-        try { if (tasksContainer) tasksContainer.style.touchAction = 'auto'; document.body.style.overflow = ''; } catch (err) {}
+        try { if (tasksContainer) tasksContainer.style.touchAction = 'auto'; } catch (err) {}
         try { clearTouchGhost(); } catch (e) {}
         draggedElement = null;
         draggedIndex = null;
