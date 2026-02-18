@@ -676,3 +676,6 @@ header>div:last-child {
     width: 100% !important;
     box-sizing: border-box;
 }
+#tasks-container {
+    overflow-y: auto !important;
+}
