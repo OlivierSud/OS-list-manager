@@ -573,6 +573,11 @@ h1 {
     }
 }
 
+.btn-lock-section {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
 /* Floating Action Button */
 .fab {
     position: fixed;
@@ -686,6 +691,7 @@ header>div:last-child {
     pointer-events: none !important;
     border-radius: var(--radius-lg);
 }
+
 .list-header.selected-section {
     background: rgba(235, 118, 0, 0.15) !important;
     border-left: 4px solid var(--accent-color) !important;

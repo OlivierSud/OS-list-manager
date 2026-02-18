@@ -1080,6 +1080,11 @@ function renderList(listId) {
                 const bulletColor = effectiveColor || '#555';
                 const colorBullet = `<span class="section-bullet" style="background: ${bulletColor};" onclick="event.stopPropagation(); window.openSectionColor(${index});"></span>`;
 
+                const isSelected = state.selectedSectionId === item.id;
+                const lockIcon = isSelected ? 'lock' : 'unlock';
+                const lockTitle = isSelected ? 'Désélectionner la section' : 'Sélectionner pour ajouter ici';
+                const lockColor = isSelected ? 'var(--accent-color)' : 'var(--text-secondary)';
+
                 el.innerHTML = `
                     <div style="display: flex; align-items: center; flex: 1;">
                             <span class="drag-handle" onclick="event.stopPropagation();"><i data-lucide="grip-vertical" style="width: 16px; height: 16px;"></i></span>
@@ -1089,6 +1094,9 @@ function renderList(listId) {
                             ${colorBullet}
                             <span class="item-text">${item.text}</span>
                             <span class="section-count" style="margin-left: 0.5rem; font-size: 0.8rem; opacity: 0.8; font-weight: bold; color: var(--text-secondary);">(${itemCount})</span>
+                            <button class="btn-icon-small btn-lock-section" title="${lockTitle}" style="margin-left: 0.5rem; color: ${lockColor};" onclick="event.stopPropagation();">
+                                <i data-lucide="${lockIcon}" style="width: 14px; height: 14px;"></i>
+                            </button>
                             <button class="btn-icon-small" title="Éditer le titre" onclick="event.stopPropagation(); startInlineEdit(this.closest('.list-header').querySelector('.item-text'), ${index})">
                                 <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
                             </button>
@@ -1125,15 +1133,22 @@ function renderList(listId) {
                             // If a drag is in progress, do not toggle
                             if (touchDragging || draggedElement) return;
                             e.stopPropagation();
-
-                            // Simple click to select/deselect
-                            if (state.selectedSectionId === item.id) {
-                                state.selectedSectionId = null;
-                            } else {
-                                state.selectedSectionId = item.id;
-                            }
-                            renderList(state.activeListId);
+                            toggleSection(index);
                         });
+
+                        // New lock button logic
+                        const lockBtn = headerRow.querySelector('.btn-lock-section');
+                        if (lockBtn) {
+                            lockBtn.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                if (state.selectedSectionId === item.id) {
+                                    state.selectedSectionId = null;
+                                } else {
+                                    state.selectedSectionId = item.id;
+                                }
+                                renderList(state.activeListId);
+                            });
+                        }
                     }
                 } catch (e) { }
 
