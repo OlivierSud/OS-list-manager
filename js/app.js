@@ -2112,6 +2112,7 @@ window.onload = function () {
     // persistent drop result panel removed (debug overlay)
 
     let touchGhost = null; // visual floating clone while dragging on touch
+    let touchLongPressTimer = null;
 
     function beginDragFromTarget(target) {
         try {
@@ -2359,13 +2360,33 @@ window.onload = function () {
         const t = e.touches[0];
         touchStartX = t.clientX; touchStartY = t.clientY;
         const target = e.target;
-        // Long-press globally disabled: drag starts only from the `.drag-handle`.
+
+        // Long-press feedback for mobile
+        if (touchLongPressTimer) clearTimeout(touchLongPressTimer);
+        touchLongPressTimer = setTimeout(() => {
+            const el = target.closest && target.closest('[draggable]');
+            if (el && !touchDragging) {
+                if ("vibrate" in navigator) navigator.vibrate(50);
+                beginDragFromTarget(target);
+            }
+        }, LONG_PRESS_MS);
     }, { passive: true });
 
     document.addEventListener('touchmove', (e) => {
-        if (!touchDragging) return;
         if (!e.touches || !e.touches[0]) return;
         const touch = e.touches[0];
+
+        if (touchLongPressTimer) {
+            const dx = Math.abs(touch.clientX - touchStartX);
+            const dy = Math.abs(touch.clientY - touchStartY);
+            if (dx > 10 || dy > 10) {
+                clearTimeout(touchLongPressTimer);
+                touchLongPressTimer = null;
+            }
+        }
+
+        if (!touchDragging) return;
+
         // remember last coordinates for fallback on drop
         touchLastX = touch.clientX; touchLastY = touch.clientY;
         if (e.cancelable) e.preventDefault();
@@ -2390,8 +2411,17 @@ window.onload = function () {
 
     }
 
-    document.addEventListener('touchend', async (e) => { await performTouchDrop(); endTouchDrag(); }, { passive: false });
-    document.addEventListener('touchcancel', (e) => { endTouchDrag(); }, { passive: true });
+    document.addEventListener('touchend', async (e) => {
+        if (touchLongPressTimer) clearTimeout(touchLongPressTimer);
+        touchLongPressTimer = null;
+        await performTouchDrop();
+        endTouchDrag();
+    }, { passive: false });
+    document.addEventListener('touchcancel', (e) => {
+        if (touchLongPressTimer) clearTimeout(touchLongPressTimer);
+        touchLongPressTimer = null;
+        endTouchDrag();
+    }, { passive: true });
 
     // Pointer fallback for environments without touch support. On Android we prefer native touch long-press.
     if (!('ontouchstart' in window)) {

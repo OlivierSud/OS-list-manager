@@ -666,3 +666,13 @@ header>div:last-child {
     width: 100% !important;
     box-sizing: border-box;
 }
+.touch-ghost {
+    background: var(--bg-secondary) !important;
+    border: 2px solid var(--accent-color) !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.6) !important;
+    transform: scale(1.05) !important;
+    transition: transform 0.1s ease !important;
+    z-index: 10000 !important;
+    opacity: 0.9 !important;
+    pointer-events: none !important;
+}
