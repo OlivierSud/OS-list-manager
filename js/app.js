@@ -2138,13 +2138,12 @@ window.onload = function () {
             ghost.classList.add('touch-ghost');
             ghost.style.position = 'fixed';
             ghost.style.left = (clientX - rect.width / 2) + 'px';
-            ghost.style.top = (clientY - rect.height / 2) + 'px';
+            ghost.style.top = ((clientY - rect.height / 2) - 40) + 'px'; // Shift up by 40px
             ghost.style.width = rect.width + 'px';
             ghost.style.height = rect.height + 'px';
             ghost.style.pointerEvents = 'none';
             ghost.style.zIndex = 9999;
-            ghost.style.opacity = '0.95';
-            ghost.style.transform = 'translate(0,0)';
+            // Removed inline opacity/transform to let CSS class handle it
             document.body.appendChild(ghost);
             touchGhost = { el: ghost, w: rect.width, h: rect.height };
         } catch (e) { touchGhost = null; }
@@ -2154,7 +2153,7 @@ window.onload = function () {
         if (!touchGhost || !touchGhost.el) return;
         try {
             const left = (clientX - touchGhost.w / 2);
-            const top = (clientY - touchGhost.h / 2);
+            const top = (clientY - touchGhost.h / 2) - 40; // Shift up by 40px
             touchGhost.el.style.left = left + 'px';
             touchGhost.el.style.top = top + 'px';
         } catch (e) { }
@@ -2366,7 +2365,9 @@ window.onload = function () {
         touchLongPressTimer = setTimeout(() => {
             const el = target.closest && target.closest('[draggable]');
             if (el && !touchDragging) {
-                if ("vibrate" in navigator) navigator.vibrate(50);
+                // Removed redundant vibration here as beginDragFromTarget (called inside) doesn't have it, 
+                // but let's keep it minimal or remove if causing issues. User asked to remove re-vibration.
+                // if ("vibrate" in navigator) navigator.vibrate(50); 
                 beginDragFromTarget(target);
             }
         }, LONG_PRESS_MS);
@@ -2437,7 +2438,7 @@ window.onload = function () {
             pointerLongPressTimer = setTimeout(() => {
                 const el = target.closest && target.closest('[draggable]');
                 if (el) {
-                    if ("vibrate" in navigator) navigator.vibrate(50);
+                    // if ("vibrate" in navigator) navigator.vibrate(50);
                     beginDragFromTarget(target);
                 }
             }, LONG_PRESS_MS);

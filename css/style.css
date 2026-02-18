@@ -427,12 +427,9 @@ h1 {
 
 /* Dragging State */
 .dragging {
-    opacity: 0.8 !important;
+    opacity: 0.5 !important;
     background: var(--bg-secondary) !important;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
-    transform: scale(1.02) !important;
-    z-index: 1000 !important;
-    border: 1px solid var(--accent-color) !important;
+    border: 1px dashed var(--accent-color) !important;
     cursor: grabbing !important;
 }
 
@@ -673,12 +670,13 @@ header>div:last-child {
 }
 
 .touch-ghost {
-    background: var(--bg-secondary) !important;
-    border: 2px solid var(--accent-color) !important;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6) !important;
-    transform: scale(1.05) !important;
-    transition: transform 0.1s ease !important;
+    background: rgba(43, 43, 43, 0.8) !important;
+    border: 1px solid var(--accent-color) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    transform: translate(15px, -15px) scale(0.9) !important;
+    /* Shift up-right to see below finger */
     z-index: 10000 !important;
-    opacity: 0.9 !important;
+    opacity: 0.7 !important;
     pointer-events: none !important;
+    border-radius: var(--radius-lg);
 }
