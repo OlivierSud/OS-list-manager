@@ -136,9 +136,9 @@ let state = {
     activeListId: null,
     lists: [],
     items: {},
+    selectedSectionId: null, // Track currently selected section
     isHeaderMode: false,
-    filter: 'all', // Global default, but we'll use per-list filters
-    searchQuery: '',
+    filter: 'all',
     searchQuery: '',
     userEmail: null,
     userPicture: null
@@ -1114,13 +1114,25 @@ function renderList(listId) {
                 try {
                     const headerRow = el.querySelector(':scope > div');
                     if (headerRow) {
+                        // Apply selection class if this is the selected section
+                        if (state.selectedSectionId === item.id) {
+                            el.classList.add('selected-section');
+                        }
+
                         headerRow.addEventListener('click', (e) => {
                             // Ignore clicks on interactive controls
-                            if (e.target.closest('.item-text') || e.target.closest('.drag-handle') || e.target.closest('button') || e.target.closest('.collapse-arrow')) return;
+                            if (e.target.closest('.item-text') || e.target.closest('.drag-handle') || e.target.closest('button') || e.target.closest('.collapse-arrow') || e.target.closest('.section-bullet')) return;
                             // If a drag is in progress, do not toggle
                             if (touchDragging || draggedElement) return;
                             e.stopPropagation();
-                            toggleSection(index);
+
+                            // Simple click to select/deselect
+                            if (state.selectedSectionId === item.id) {
+                                state.selectedSectionId = null;
+                            } else {
+                                state.selectedSectionId = item.id;
+                            }
+                            renderList(state.activeListId);
                         });
                     }
                 } catch (e) { }
@@ -1207,6 +1219,7 @@ function renderList(listId) {
 function openList(id) {
     state.activeListId = id;
     state.view = 'list';
+    state.selectedSectionId = null; // Reset selection on list change
     renderList(id);
     // push history state for this list view
     pushAppState({ app: 'oslist', view: 'list', id: id });
@@ -1303,6 +1316,7 @@ function goHome() {
     state.activeListId = null;
     state.view = 'home';
     state.searchQuery = '';
+    state.selectedSectionId = null; // Reset selection
     if (searchInput) {
         searchInput.value = '';
         searchInput.style.width = '100px';
@@ -1333,48 +1347,61 @@ function addItem() {
     const listId = state.activeListId;
     const isHeader = state.isHeaderMode;
 
-    // Create new item locally
-    // Infer parentId based on previous items if we are adding a task
-    let inferredPid = null;
+    let parentId = null;
     let isStandalone = true;
+    const items = state.items[listId] || [];
+
     if (!isHeader) {
-        // Look for the last header encountered in the existing list
-        const items = state.items[listId] || [];
-        if (items.length > 0) {
-            // Find the header that currently "owns" the end of the list
-            for (let i = items.length - 1; i >= 0; i--) {
-                if (items[i].isHeader) {
-                    inferredPid = items[i].id;
-                    isStandalone = false;
-                    break;
-                }
-            }
+        if (state.selectedSectionId) {
+            // Add to selected section
+            parentId = state.selectedSectionId;
+            isStandalone = false;
+        } else {
+            // Standalone (at the bottom)
+            parentId = null;
+            isStandalone = true;
         }
     }
 
     const newItem = {
-        id: `${listId}-${Date.now()}`, // Temporary ID
+        id: `${listId}-${Date.now()}`,
         text: text,
         done: false,
         isHeader: isHeader,
         isStandalone: isStandalone,
-        parentId: inferredPid
+        parentId: parentId
     };
 
     if (!state.items[listId]) state.items[listId] = [];
-    state.items[listId].push(newItem);
 
-    newTaskInput.value = ''; // Clear input
-
-    // Reset Header Mode if active
-    if (state.isHeaderMode) {
-        toggleHeaderModeState();
+    // Insertion Logic
+    if (parentId) {
+        // Find the selected section and insert after all its current children
+        const sectionIndex = items.findIndex(i => i.id === parentId);
+        if (sectionIndex !== -1) {
+            let insertIndex = sectionIndex + 1;
+            while (insertIndex < items.length) {
+                const current = items[insertIndex];
+                if (current.isHeader || current.isStandalone) break;
+                insertIndex++;
+            }
+            state.items[listId].splice(insertIndex, 0, newItem);
+            // Need full sync for middle insertion
+            syncOrderToSheet(listId);
+        } else {
+            state.items[listId].push(newItem);
+            addItemToSheet(listId, text, isHeader);
+        }
+    } else {
+        // Bottom of list
+        state.items[listId].push(newItem);
+        addItemToSheet(listId, text, isHeader);
     }
 
-    renderList(listId); // Update UI
+    newTaskInput.value = '';
+    if (state.isHeaderMode) toggleHeaderModeState();
 
-    // Sync with Cloud
-    addItemToSheet(listId, text, isHeader);
+    renderList(listId);
 }
 
 function toggleHeaderModeState() {
