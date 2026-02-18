@@ -35,7 +35,10 @@
     line-height: 1.5;
 }
 
-html, body, #app, main {
+html,
+body,
+#app,
+main {
     /* Prevent pull-to-refresh / overscroll navigation on supporting browsers (Android PWA/Chrome)
        and ensure the app's own scrolling is used. */
     overscroll-behavior: none;
@@ -71,7 +74,8 @@ main {
 }
 
 /* Ensure task/list containers allow native vertical panning on touch devices */
-#tasks-container, #lists-container {
+#tasks-container,
+#lists-container {
     touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
     overflow-y: auto;
@@ -240,7 +244,7 @@ h1 {
     }
 
     /* Left group (back button + title) becomes full width */
-    header > div:first-child {
+    header>div:first-child {
         display: flex;
         align-items: center;
         gap: 0.5rem;
@@ -258,7 +262,7 @@ h1 {
     }
 
     /* Place the controls row under the title and right-aligned */
-    header > div:last-child {
+    header>div:last-child {
         width: 100%;
         display: flex;
         justify-content: flex-end;
@@ -410,10 +414,17 @@ h1 {
 .drag-handle {
     cursor: grab;
     color: var(--text-secondary);
-    padding: 0.25rem;
-    margin-right: 0.5rem;
+    padding: 0.5rem;
+    margin-right: 0.25rem;
     opacity: 0.5;
     transition: opacity 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    box-sizing: border-box;
+    flex-shrink: 0;
 }
 
 .drag-handle:hover {
@@ -550,6 +561,7 @@ h1 {
     transform: translateY(0);
     margin-left: 0.5rem;
 }
+
 .list-header:hover .btn-icon-small {
     opacity: 1;
     pointer-events: auto;
@@ -645,7 +657,7 @@ h1 {
 
 /* Make the header's right area flexible so the search input can grow
    to occupy remaining horizontal space when visible. */
-header > div:last-child {
+header>div:last-child {
     display: flex;
     align-items: center;
     gap: 0.25rem;

@@ -507,7 +507,7 @@ async function toggleItemInSheet(listId, itemId, newStatus) {
 
     // Row index in sheet is 1-based usually for A1 notation, but values array is 0-based.
     // A1 notation: Sheet!B{rowIndex+1}:D{rowIndex+1}
-        const range = `${list.name}!A${rowIndex + 1}:D${rowIndex + 1}`;
+    const range = `${list.name}!A${rowIndex + 1}:D${rowIndex + 1}`;
 
     try {
         // Prevent toggling headers if somehow triggered
@@ -1123,7 +1123,7 @@ function renderList(listId) {
                             toggleSection(index);
                         });
                     }
-                } catch (e) {}
+                } catch (e) { }
 
                 setupDragHandlers(el, index, true);
             } else {
@@ -1236,7 +1236,7 @@ async function refreshApp() {
         location.reload();
     } catch (e) {
         console.error('Failed to refresh app:', e);
-        try { location.reload(); } catch (err) {}
+        try { location.reload(); } catch (err) { }
     }
 }
 
@@ -1470,7 +1470,7 @@ function updateSectionColor(index, color) {
 function setupDragHandlers(element, index, isHeader) {
     element.addEventListener('dragstart', (e) => {
         // Ensure any existing touch ghost from prior touch interactions is cleared
-        try { clearTouchGhost(); } catch (err) {}
+        try { clearTouchGhost(); } catch (err) { }
         touchDragging = false;
         draggedElement = element;
         draggedIndex = index;
@@ -1482,7 +1482,7 @@ function setupDragHandlers(element, index, isHeader) {
         try {
             if (tasksContainer) tasksContainer.style.touchAction = 'none';
             // Avoid toggling document.body overflow globally — leave body scrolling untouched
-        } catch (err) {}
+        } catch (err) { }
 
         // If dragging a header, collapse ALL sections to prevent dropping inside them
         // This simplifies the structure to a flat list of headers + collapsed items
@@ -1516,7 +1516,7 @@ function setupDragHandlers(element, index, isHeader) {
             if (e && e.dataTransfer && _blankDragImage) {
                 e.dataTransfer.setDragImage(_blankDragImage, 0, 0);
             }
-        } catch (err) {}
+        } catch (err) { }
     });
 
     element.addEventListener('dragend', (e) => {
@@ -1533,9 +1533,9 @@ function setupDragHandlers(element, index, isHeader) {
         try {
             if (tasksContainer) tasksContainer.style.touchAction = 'auto';
             document.body.style.overflow = '';
-        } catch (err) {}
+        } catch (err) { }
         // Ensure any touch ghost from mobile interaction is removed
-        try { clearTouchGhost(); } catch (e) {}
+        try { clearTouchGhost(); } catch (e) { }
         // Reset drag state to avoid lingering ghosts or references
         touchDragging = false;
         if (draggedElement) draggedElement.classList.remove('dragging');
@@ -1718,7 +1718,7 @@ function setupDragHandlers(element, index, isHeader) {
                 }
             }, { passive: false });
         }
-    } catch (e) {}
+    } catch (e) { }
 }
 
 function setupBoundaryDragHandlers(element, position) {
@@ -1813,52 +1813,52 @@ async function syncOrderToSheet(listId) {
     if (!list) return;
 
     const items = state.items[listId];
-        const values = items.map((item, idx) => {
-            let meta = [];
-            if (item.isStandalone) meta.push("STANDALONE");
-            if (item.isHeader && item.id) meta.push(`UID:${item.id}`);
+    const values = items.map((item, idx) => {
+        let meta = [];
+        if (item.isStandalone) meta.push("STANDALONE");
+        if (item.isHeader && item.id) meta.push(`UID:${item.id}`);
 
-            // Recalculate closest preceding header for PID/SECTION
-            let currentHeaderId = null;
-            for (let i = idx - 1; i >= 0; i--) {
-                if (items[i].isHeader) {
-                    currentHeaderId = items[i].id;
-                    break;
-                }
+        // Recalculate closest preceding header for PID/SECTION
+        let currentHeaderId = null;
+        for (let i = idx - 1; i >= 0; i--) {
+            if (items[i].isHeader) {
+                currentHeaderId = items[i].id;
+                break;
             }
+        }
 
-            if (!item.isHeader) {
-                if (!item.isStandalone) {
-                    item.parentId = currentHeaderId;
-                } else {
-                    item.parentId = null;
-                }
-                if (item.parentId) meta.push(`PID:${item.parentId}`);
-
-                // Add explicit SECTION name metadata to make ownership clear in Sheets
-                const parentHeader = items.find(h => h.isHeader && h.id === item.parentId);
-                if (parentHeader && parentHeader.text) {
-                    // Replace any pipe chars to avoid breaking our meta format
-                    const safeName = parentHeader.text.replace(/\|/g, ' ');
-                    meta.push(`SECTION:${safeName}`);
-                }
+        if (!item.isHeader) {
+            if (!item.isStandalone) {
+                item.parentId = currentHeaderId;
             } else {
                 item.parentId = null;
             }
+            if (item.parentId) meta.push(`PID:${item.parentId}`);
 
-            if (item.color) meta.push(`COLOR:${item.color}`);
-
-            let colC = meta.join("|");
-            if (idx === 0) {
-                colC = `FILTER:${list.filter}${colC ? "|" + colC : ""}`;
+            // Add explicit SECTION name metadata to make ownership clear in Sheets
+            const parentHeader = items.find(h => h.isHeader && h.id === item.parentId);
+            if (parentHeader && parentHeader.text) {
+                // Replace any pipe chars to avoid breaking our meta format
+                const safeName = parentHeader.text.replace(/\|/g, ' ');
+                meta.push(`SECTION:${safeName}`);
             }
-            return [
-                item.text,
-                item.isHeader ? 'HEADER' : (item.done ? 'TRUE' : 'FALSE'),
-                colC,
-                item.lastModifier || ""
-            ];
-        });
+        } else {
+            item.parentId = null;
+        }
+
+        if (item.color) meta.push(`COLOR:${item.color}`);
+
+        let colC = meta.join("|");
+        if (idx === 0) {
+            colC = `FILTER:${list.filter}${colC ? "|" + colC : ""}`;
+        }
+        return [
+            item.text,
+            item.isHeader ? 'HEADER' : (item.done ? 'TRUE' : 'FALSE'),
+            colC,
+            item.lastModifier || ""
+        ];
+    });
 
     try {
         // Clear and rewrite the entire sheet A:D
@@ -2048,7 +2048,7 @@ window.onload = function () {
 
         tasksContainer.addEventListener('drop', (e) => {
             stopAutoScroll();
-            try { clearTouchGhost(); } catch (e) {}
+            try { clearTouchGhost(); } catch (e) { }
             touchDragging = false;
             draggedElement = null;
             draggedIndex = null;
@@ -2061,8 +2061,8 @@ window.onload = function () {
         handleAutoScrollDuringDrag(e);
     });
     document.addEventListener('dragleave', () => stopAutoScroll());
-    document.addEventListener('drop', (e) => { stopAutoScroll(); try { clearTouchGhost(); } catch (err) {} touchDragging = false; draggedElement = null; draggedIndex = null; });
-    document.addEventListener('dragend', (e) => { try { clearTouchGhost(); } catch (err) {} touchDragging = false; draggedElement = null; draggedIndex = null; stopAutoScroll(); });
+    document.addEventListener('drop', (e) => { stopAutoScroll(); try { clearTouchGhost(); } catch (err) { } touchDragging = false; draggedElement = null; draggedIndex = null; });
+    document.addEventListener('dragend', (e) => { try { clearTouchGhost(); } catch (err) { } touchDragging = false; draggedElement = null; draggedIndex = null; stopAutoScroll(); });
 
     // Extra safeguard: if a mousemove happens on desktop and a touch ghost remains (from hybrid flow), clear it.
     document.addEventListener('mousemove', (e) => {
@@ -2071,20 +2071,20 @@ window.onload = function () {
             if (touchGhost) {
                 clearTouchGhost();
             }
-        } catch (err) {}
+        } catch (err) { }
     });
 
     // Initialize history state for in-app navigation
     try {
         history.replaceState({ app: 'oslist', view: 'home' }, '', '');
-    } catch (e) {}
+    } catch (e) { }
 
     window.addEventListener('popstate', (e) => {
         const s = e.state;
         if (!s || s.app !== 'oslist') {
             // If popstate is not ours, force app to home and push an app state to keep user inside
             goHome();
-            try { history.pushState({ app: 'oslist', view: 'home' }, '', ''); } catch (err) {}
+            try { history.pushState({ app: 'oslist', view: 'home' }, '', ''); } catch (err) { }
             return;
         }
 
@@ -2110,7 +2110,7 @@ window.onload = function () {
     }
 
     // persistent drop result panel removed (debug overlay)
-    
+
     let touchGhost = null; // visual floating clone while dragging on touch
 
     function beginDragFromTarget(target) {
@@ -2122,11 +2122,11 @@ window.onload = function () {
             touchDragging = true;
             el.classList.add('dragging');
             if (tasksContainer) tasksContainer.classList.add('dragging-active');
-            try { if (tasksContainer) tasksContainer.style.touchAction = 'none'; } catch (err) {}
+            try { if (tasksContainer) tasksContainer.style.touchAction = 'none'; } catch (err) { }
             // create floating ghost to follow finger for better UX on mobile
-            try { createTouchGhost(el, touchStartX, touchStartY); } catch (e) {}
-            
-        } catch (err) {}
+            try { createTouchGhost(el, touchStartX, touchStartY); } catch (e) { }
+
+        } catch (err) { }
     }
 
     function createTouchGhost(el, clientX, clientY) {
@@ -2156,12 +2156,12 @@ window.onload = function () {
             const top = (clientY - touchGhost.h / 2);
             touchGhost.el.style.left = left + 'px';
             touchGhost.el.style.top = top + 'px';
-        } catch (e) {}
+        } catch (e) { }
     }
 
     function clearTouchGhost() {
         if (!touchGhost) return;
-        try { if (touchGhost.el && touchGhost.el.parentNode) touchGhost.el.parentNode.removeChild(touchGhost.el); } catch (e) {}
+        try { if (touchGhost.el && touchGhost.el.parentNode) touchGhost.el.parentNode.removeChild(touchGhost.el); } catch (e) { }
         touchGhost = null;
     }
 
@@ -2193,7 +2193,7 @@ window.onload = function () {
                 currentTouchDrop.element.classList.remove('drag-over-top');
                 currentTouchDrop.element.classList.remove('drag-over-bottom');
             }
-        } catch (e) {}
+        } catch (e) { }
         currentTouchDrop = null;
     }
 
@@ -2207,7 +2207,7 @@ window.onload = function () {
                 else info.element.classList.add('drag-over-top');
             }
             currentTouchDrop = info;
-        } catch (e) {}
+        } catch (e) { }
     }
 
     async function performTouchDrop() {
@@ -2228,7 +2228,7 @@ window.onload = function () {
                 const fy = r.top + (r.height / 2);
                 const fallback = findDropAtPoint(fx, fy);
                 if (fallback) currentTouchDrop = fallback;
-            } catch (e) {}
+            } catch (e) { }
         }
 
         if (!currentTouchDrop) {
@@ -2237,9 +2237,9 @@ window.onload = function () {
             if (listId === null || listId === undefined) return;
             currentTouchDrop = { type: 'spacer', index: (state.items[listId] || []).length, element: null };
         }
-        
-        try { console.log('performTouchDrop resolved target', currentTouchDrop, 'draggedIndex=', draggedIndex); } catch (e) {}
-        try { showToast(`Cible: ${currentTouchDrop.type} @ ${currentTouchDrop.index}`); } catch (e) {}
+
+        try { console.log('performTouchDrop resolved target', currentTouchDrop, 'draggedIndex=', draggedIndex); } catch (e) { }
+        try { showToast(`Cible: ${currentTouchDrop.type} @ ${currentTouchDrop.index}`); } catch (e) { }
         const listId = state.activeListId;
         if (listId === null || listId === undefined) return;
         const originalItems = [...state.items[listId]];
@@ -2304,7 +2304,7 @@ window.onload = function () {
                 showToast(`Parent ciblé: ${candText}`);
                 // debug overlay removed; keep lightweight toast
                 console.log('parentCandidate before move', { id: candId, text: candText });
-            } catch (e) {}
+            } catch (e) { }
 
             // If parentCandidate points to the moved item itself (dropping around itself), find previous header
             if (parentCandidate && parentCandidate.id === movedItem.id) {
@@ -2338,17 +2338,17 @@ window.onload = function () {
             movedItem.isStandalone = !movedItem.parentId;
             movedItem.color = null; // allow inheritance
             // debug show moved item parent state
-            try { showToast(`Après: parentId=${movedItem.parentId ? movedItem.parentId : 'null'}`); console.log('movedItem after parent set', { id: movedItem.id, parentId: movedItem.parentId, isStandalone: movedItem.isStandalone }); } catch (e) {}
+            try { showToast(`Après: parentId=${movedItem.parentId ? movedItem.parentId : 'null'}`); console.log('movedItem after parent set', { id: movedItem.id, parentId: movedItem.parentId, isStandalone: movedItem.isStandalone }); } catch (e) { }
         }
 
         state.items[listId] = items;
-        try { console.log('performTouchDrop after move, new order:', items.map(i => i.text)); } catch (e) {}
-        try { showToast('Relâché — mise à jour appliquée', 1600); } catch (e) {}
+        try { console.log('performTouchDrop after move, new order:', items.map(i => i.text)); } catch (e) { }
+        try { showToast('Relâché — mise à jour appliquée', 1600); } catch (e) { }
         clearTouchIndicator();
         renderList(listId);
         syncOrderToSheet(listId);
         // Clean up any possible touch ghost left from hybrid interactions
-        try { clearTouchGhost(); } catch (e) {}
+        try { clearTouchGhost(); } catch (e) { }
         touchDragging = false;
         draggedElement = null;
         draggedIndex = null;
@@ -2360,7 +2360,7 @@ window.onload = function () {
         touchStartX = t.clientX; touchStartY = t.clientY;
         const target = e.target;
         // Long-press globally disabled: drag starts only from the `.drag-handle`.
-    }, { passive: false });
+    }, { passive: true });
 
     document.addEventListener('touchmove', (e) => {
         if (!touchDragging) return;
@@ -2371,10 +2371,10 @@ window.onload = function () {
         if (e.cancelable) e.preventDefault();
         handleAutoScrollDuringDrag({ clientY: touch.clientY });
         // Move ghost and show drop target
-        try { moveTouchGhost(touch.clientX, touch.clientY); } catch (err) {}
+        try { moveTouchGhost(touch.clientX, touch.clientY); } catch (err) { }
         const info = findDropAtPoint(touch.clientX, touch.clientY);
         showTouchIndicator(info);
-        
+
     }, { passive: false });
 
     function endTouchDrag() {
@@ -2383,11 +2383,11 @@ window.onload = function () {
         stopAutoScroll();
         if (draggedElement) draggedElement.classList.remove('dragging');
         if (tasksContainer) tasksContainer.classList.remove('dragging-active');
-        try { if (tasksContainer) tasksContainer.style.touchAction = 'auto'; } catch (err) {}
-        try { clearTouchGhost(); } catch (e) {}
+        try { if (tasksContainer) tasksContainer.style.touchAction = 'auto'; } catch (err) { }
+        try { clearTouchGhost(); } catch (e) { }
         draggedElement = null;
         draggedIndex = null;
-        
+
     }
 
     document.addEventListener('touchend', async (e) => { await performTouchDrop(); endTouchDrag(); }, { passive: false });
@@ -2413,13 +2413,13 @@ window.onload = function () {
             }
             if (!touchDragging) return;
             handleAutoScrollDuringDrag(e);
-            try { moveTouchGhost(e.clientX, e.clientY); } catch (err) {}
+            try { moveTouchGhost(e.clientX, e.clientY); } catch (err) { }
             touchLastX = e.clientX; touchLastY = e.clientY;
         }, { passive: false });
 
         document.addEventListener('pointerup', (e) => {
             if (pointerLongPressTimer) { clearTimeout(pointerLongPressTimer); pointerLongPressTimer = null; }
-                (async () => { await performTouchDrop(); endTouchDrag(); })();
+            (async () => { await performTouchDrop(); endTouchDrag(); })();
         });
     }
 };
