@@ -2182,7 +2182,7 @@ window.onload = function () {
             ghost.classList.add('touch-ghost');
             ghost.style.position = 'fixed';
             ghost.style.left = (clientX - rect.width / 2) + 'px';
-            ghost.style.top = ((clientY - rect.height / 2) - 40) + 'px'; // Shift up by 40px
+            ghost.style.top = (clientY - rect.height / 2) + 'px'; // Centered under finger
             ghost.style.width = rect.width + 'px';
             ghost.style.height = rect.height + 'px';
             ghost.style.pointerEvents = 'none';
@@ -2197,7 +2197,7 @@ window.onload = function () {
         if (!touchGhost || !touchGhost.el) return;
         try {
             const left = (clientX - touchGhost.w / 2);
-            const top = (clientY - touchGhost.h / 2) - 40; // Shift up by 40px
+            const top = (clientY - touchGhost.h / 2); // Centered under finger
             touchGhost.el.style.left = left + 'px';
             touchGhost.el.style.top = top + 'px';
         } catch (e) { }
