@@ -41,6 +41,12 @@ let currentListName = "";
 let collapsedSections = new Set(); // Track collapsed section indices
 let draggedElement = null;
 let draggedIndex = null;
+const LONG_PRESS_MS = 280;
+let touchDragging = false;
+let touchStartX = 0, touchStartY = 0;
+let touchLastX = 0, touchLastY = 0;
+let touchGhost = null; // visual floating clone
+let touchLongPressTimer = null;
 
 // Drag / Auto-scroll configuration (adjust these values to tune behavior)
 // You can change them directly in code or at runtime via `window.DRAG_CONFIG`.
@@ -2141,11 +2147,12 @@ window.onload = function () {
         }
     });
 
-    // Touch & Pointer support: use handle-driven drags on mobile/PWA
-    let touchDragging = false;
-    let touchStartX = 0, touchStartY = 0;
-    let touchLastX = 0, touchLastY = 0;
-    const LONG_PRESS_MS = 280;
+    // Initialize touch variables (already declared globally)
+    touchDragging = false;
+    touchStartX = 0; touchStartY = 0;
+    touchLastX = 0; touchLastY = 0;
+    touchGhost = null;
+    touchLongPressTimer = null;
 
     // Simple toast helper (disabled in production to avoid debug popups)
     function showToast(msg, duration = 2000) {
@@ -2154,9 +2161,6 @@ window.onload = function () {
     }
 
     // persistent drop result panel removed (debug overlay)
-
-    let touchGhost = null; // visual floating clone while dragging on touch
-    let touchLongPressTimer = null;
 
     function beginDragFromTarget(target) {
         try {

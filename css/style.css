@@ -690,12 +690,15 @@ header>div:last-child {
 }
 
 .touch-ghost {
-    border: 1px solid var(--accent-color) !important;
+    background: rgba(43, 43, 43, 0.6) !important;
+    /* Base transparency for visibility */
+    border: 0.6px solid var(--accent-color) !important;
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4) !important;
     transform: scale(1.02) !important;
     /* No translate shift, centered under finger */
     z-index: 10000 !important;
-    opacity: 0.6 !important;
+    opacity: 0.8 !important;
+    /* Increased opacity for better visibility */
     pointer-events: none !important;
     border-radius: var(--radius-lg);
 }
