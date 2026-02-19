@@ -1087,23 +1087,23 @@ function renderList(listId) {
 
                 el.innerHTML = `
                     <div style="display: flex; align-items: center; flex: 1;">
-                            <span class="drag-handle" onclick="event.stopPropagation();"><i data-lucide="grip-vertical" style="width: 16px; height: 16px;"></i></span>
+                            <span class="drag-handle" onclick="event.stopPropagation();"><i data-lucide="grip-vertical" style="width: 20px; height: 20px;"></i></span>
                             <span class="collapse-arrow ${arrowClass}" data-section-index="${index}">
-                                <i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i>
+                                <i data-lucide="chevron-down" style="width: 20px; height: 20px;"></i>
                             </span>
                             ${colorBullet}
                             <span class="item-text">${item.text}</span>
                             <span class="section-count" style="margin-left: 0.5rem; font-size: 0.8rem; opacity: 0.8; font-weight: bold; color: var(--text-secondary);">(${itemCount})</span>
                             <button class="btn-icon-small btn-lock-section" title="${lockTitle}" style="margin-left: 0.5rem; color: ${lockColor};" onclick="event.stopPropagation();">
-                                <i data-lucide="${lockIcon}" style="width: 14px; height: 14px;"></i>
+                                <i data-lucide="${lockIcon}" style="width: 18px; height: 18px;"></i>
                             </button>
                             <button class="btn-icon-small" title="Éditer le titre" onclick="event.stopPropagation(); startInlineEdit(this.closest('.list-header').querySelector('.item-text'), ${index})">
-                                <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
+                                <i data-lucide="edit-3" style="width: 18px; height: 18px;"></i>
                             </button>
                     </div>
                     <div style="display: flex; gap: 0.25rem;">
                         <button class="btn-delete-item" onclick="event.stopPropagation(); deleteListItem(${index})">
-                            <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+                            <i data-lucide="x" style="width: 18px; height: 18px;"></i>
                         </button>
                     </div>
                 `;
@@ -1201,13 +1201,13 @@ function renderList(listId) {
                 const checkIcon = item.done ? '<i data-lucide="check" style="width:16px; color: white;"></i>' : '';
 
                 el.innerHTML = `
-                    <span class="drag-handle"><i data-lucide="grip-vertical" style="width: 16px; height: 16px;"></i></span>
+                    <span class="drag-handle"><i data-lucide="grip-vertical" style="width: 20px; height: 20px;"></i></span>
                     <div class="task-checkbox" onclick="event.stopPropagation(); toggleItem('${item.id}')">
                         ${checkIcon}
                     </div>
                     <span class="item-text" style="flex: 1" onclick="event.stopPropagation(); startInlineEdit(this, ${index})">${item.text}</span>
                     <button class="btn-delete-item" onclick="event.stopPropagation(); deleteListItem(${index})">
-                        <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+                        <i data-lucide="x" style="width: 18px; height: 18px;"></i>
                     </button>
                 `;
 

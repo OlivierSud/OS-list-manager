@@ -207,7 +207,7 @@ header {
     padding: 0.75rem 1rem;
     background-color: var(--bg-primary);
     /* Ensure background covers content behind sticky */
-    border-bottom: 2px solid var(--accent-color);
+    border-bottom: 1px solid var(--accent-color);
     overflow: visible !important;
     /* Allow menu to overflow */
 }
@@ -267,7 +267,8 @@ h1 {
     /* Reserve space for border */
     color: var(--text-secondary);
     cursor: pointer;
-    padding: 0.4rem;
+    padding: 0.55rem;
+    /* Increased from 0.4rem for better click zone on desktop/mobile */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -291,7 +292,8 @@ h1 {
     border: none;
     color: var(--text-secondary);
     cursor: pointer;
-    padding: 0.25rem;
+    padding: 0.5rem;
+    /* Increased from 0.25rem */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -324,7 +326,8 @@ h1 {
 
 /* List Styles */
 .list-item {
-    padding: 1.25rem;
+    padding: 0.75rem 1.25rem;
+    /* Further reduced vertical padding */
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -359,13 +362,14 @@ h1 {
 
 /* Task Styles */
 .task-item {
-    padding: 1rem;
+    padding: 0.56rem 1rem;
+    /* Further reduced vertical padding (~25% less) */
     display: flex;
     align-items: center;
     gap: 1rem;
     cursor: pointer;
     transition: all 0.2s;
-    border-left: 2px solid transparent;
+    border-left: 1px solid transparent;
     touch-action: pan-y;
     /* Allow vertical scroll */
 }
@@ -373,7 +377,7 @@ h1 {
 .task-item.in-section {
     margin-left: 1.25rem;
     padding-left: 0.75rem;
-    border-left: 2px solid rgba(255, 255, 255, 0.15);
+    border-left: 1px solid rgba(255, 255, 255, 0.15);
     /* Subtle grouping line */
 }
 
@@ -497,18 +501,20 @@ h1 {
     margin-left: 1.5rem;
     /* Slightly more than items to emphasize role */
     padding-left: 0.75rem;
-    border-left: 3px solid rgba(255, 255, 255, 0.2);
+    border-left: 1px solid rgba(255, 255, 255, 0.2);
+    /* Reduced from 2px */
     background: rgba(0, 0, 0, 0.2);
     /* Darker than main headers */
     font-size: 0.85rem;
-    min-height: 40px;
+    min-height: 32px;
+    /* Reduced from 40px */
 }
 
 .task-item.in-sub-section {
     margin-left: 3.25rem;
     /* Triple the base indent for clarity */
     padding-left: 0.75rem;
-    border-left: 2px solid rgba(255, 255, 255, 0.1);
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Collapse Arrow */
@@ -520,8 +526,10 @@ h1 {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 20px;
-    height: 20px;
+    width: 32px;
+    /* Increased from 20px for better touch target */
+    height: 32px;
+    /* Increased from 20px for better touch target */
 }
 
 .collapse-arrow.collapsed {
@@ -530,13 +538,14 @@ h1 {
 
 .list-header {
     background: transparent;
-    padding: 1.5rem 0.5rem 0.5rem 0.5rem;
+    padding: 0.82rem 0.5rem 0.26rem 0.5rem;
+    /* Further reduced from 1.1rem ... 0.35rem */
     color: var(--accent-color);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     font-size: 0.85rem;
-    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     margin-top: 0.5rem;
     margin-bottom: 0.75rem;
     /* Space before first item in section */
