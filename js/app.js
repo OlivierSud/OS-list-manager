@@ -1093,7 +1093,7 @@ function renderList(listId) {
 
                 el.innerHTML = `
                     <div style="display: flex; align-items: center; flex: 1;">
-                            <span class="drag-handle" onclick="event.stopPropagation();"><i data-lucide="grip-vertical" style="width: 20px; height: 20px;"></i></span>
+                            <span class="drag-handle" onclick="event.stopPropagation();"></span>
                             <span class="collapse-arrow ${arrowClass}" data-section-index="${index}">
                                 <i data-lucide="chevron-down" style="width: 20px; height: 20px;"></i>
                             </span>
@@ -1207,7 +1207,7 @@ function renderList(listId) {
                 const checkIcon = item.done ? '<i data-lucide="check" style="width:16px; color: white;"></i>' : '';
 
                 el.innerHTML = `
-                    <span class="drag-handle"><i data-lucide="grip-vertical" style="width: 20px; height: 20px;"></i></span>
+                    <span class="drag-handle"></span>
                     <div class="task-checkbox" onclick="event.stopPropagation(); toggleItem('${item.id}')">
                         ${checkIcon}
                     </div>
