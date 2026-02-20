@@ -1204,7 +1204,7 @@ function renderList(listId) {
                 el.dataset.index = index;
                 el.dataset.isHeader = 'false';
 
-                const checkIcon = item.done ? '<i data-lucide="check" style="width:16px; color: white;"></i>' : '';
+                const checkIcon = item.done ? '<i data-lucide="check" style="width:32px; color: white;"></i>' : '';
 
                 el.innerHTML = `
                     <span class="drag-handle"></span>

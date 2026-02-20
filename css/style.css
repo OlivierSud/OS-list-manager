@@ -382,9 +382,9 @@ h1 {
 }
 
 .task-checkbox {
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
     /* Sharper */
     background: #181818;
     /* Inner shadow look */
