@@ -1578,31 +1578,51 @@ function toggleHeaderModeState() {
 }
 
 function openOptions(e, id, name) {
-    if (e) e.stopPropagation(); // Prevent opening the list
+    if (e) e.stopPropagation();
     currentListId = id;
     currentListName = name;
 
     modalTitle.innerText = name;
-    modalDesc.innerText = "Options pour la liste";
+    modalDesc.innerText = state.view === 'list' ? "Actions groupées et réglages" : "Options pour la liste";
 
-    // Explicitly unhide if it was hidden
-    modal.style.display = 'flex'; // Ensure flex layout
+    // Show/Hide Modal
+    modal.style.display = 'flex';
     modal.classList.remove('hidden');
 
-    // Show list action row ONLY if we are inside a list (Settings gear click)
-    if (listActionsRow) {
-        if (state.view === 'list') {
+    // Layout Composition based on View
+    if (state.view === 'list') {
+        // --- VIEW: INSIDE A LIST (Settings gear click) ---
+        if (listActionsRow) {
             listActionsRow.classList.remove('hidden');
             listActionsRow.style.setProperty('display', 'flex', 'important');
-            console.log("[Options] Showing list actions row (List View)");
-        } else {
+        }
+        if (btnCheckAll) btnCheckAll.classList.remove('hidden');
+        if (btnUncheckAll) btnUncheckAll.classList.remove('hidden');
+
+        // Settings in list view usually focus on cleanup or renaming
+        if (btnRename) btnRename.classList.remove('hidden');
+        if (btnColor) btnColor.classList.remove('hidden');
+        if (btnDelete) btnDelete.classList.remove('hidden');
+        if (btnDuplicate) btnDuplicate.classList.add('hidden'); // Simplified: no duplicate from here
+    } else {
+        // --- VIEW: HOME SCREEN (Mes Listes) ---
+        if (listActionsRow) {
             listActionsRow.classList.add('hidden');
             listActionsRow.style.setProperty('display', 'none', 'important');
-            console.log("[Options] Hiding list actions row (Home View)");
         }
+        if (btnCheckAll) btnCheckAll.classList.add('hidden');
+        if (btnUncheckAll) btnUncheckAll.classList.add('hidden');
+
+        if (btnRename) btnRename.classList.remove('hidden');
+        if (btnDuplicate) btnDuplicate.classList.remove('hidden');
+        if (btnColor) btnColor.classList.remove('hidden');
+        if (btnDelete) btnDelete.classList.remove('hidden');
     }
 
-    // Initialize list level buttons
+    // Always reset logout for regular options (only shown in Logout button click)
+    if (btnLogout) btnLogout.classList.add('hidden');
+
+    // Re-bind onclick because id/name changed
     if (btnCheckAll) {
         btnCheckAll.onclick = (ev) => {
             ev.stopPropagation();
@@ -1614,17 +1634,6 @@ function openOptions(e, id, name) {
             ev.stopPropagation();
             checkAllItems(id, false);
         };
-    }
-
-    if (btnRename) btnRename.classList.remove('hidden');
-    if (btnDuplicate) btnDuplicate.classList.remove('hidden');
-    if (btnColor) btnColor.classList.remove('hidden');
-    if (btnDelete) btnDelete.classList.remove('hidden');
-
-    // Ultimate fallback for individual buttons hiding on Home View
-    if (state.view !== 'list') {
-        if (btnCheckAll) btnCheckAll.classList.add('hidden');
-        if (btnUncheckAll) btnUncheckAll.classList.add('hidden');
     }
 }
 
@@ -1696,7 +1705,10 @@ function openSectionOptions(index) {
     // Hide duplicate for section
     if (btnDuplicate) btnDuplicate.classList.add('hidden');
     if (btnLogout) btnLogout.classList.add('hidden');
-    if (listActionsRow) listActionsRow.classList.add('hidden');
+    if (listActionsRow) {
+        listActionsRow.classList.add('hidden');
+        listActionsRow.style.setProperty('display', 'none', 'important');
+    }
 
     modal.style.display = 'flex';
     modal.classList.remove('hidden');
