@@ -349,41 +349,40 @@ h1 {
     text-overflow: ellipsis;
 }
 
-/* Make header responsive: if horizontal space is insufficient on small screens,
-   stack the title above the right-side buttons so it wraps cleanly. */
+/* Optimized Header Spacing on Mobile */
 @media (max-width: 520px) {
     header {
-        align-items: flex-start;
         padding: 0.6rem 0.75rem;
-    }
-
-    /* Left group (back button + title) becomes full width */
-    header>div:first-child {
-        display: flex;
-        align-items: center;
         gap: 0.5rem;
-        width: 100%;
-        min-width: 0;
     }
 
-    /* Allow the title to wrap onto a new line above the right-side buttons */
     #header-title {
-        white-space: normal;
-        word-break: break-word;
-        width: 100%;
-        margin-bottom: 0.35rem;
-        font-size: 1.1rem;
+        font-size: 1.15rem;
     }
 
-    /* Place the controls row under the title and right-aligned */
-    header>div:last-child {
-        width: 100%;
-        display: flex;
-        justify-content: flex-end;
-        gap: 0.25rem;
-        align-items: center;
+    .controls-row {
+        gap: 0.5rem;
+    }
+
+    #search-input {
+        height: 32px;
+        font-size: 13px;
+        padding: 4px 8px 4px 36px;
+    }
+
+    #header-progress-label {
+        font-size: 0.7rem;
+    }
+
+    #header-progress-pct {
+        font-size: 0.85rem;
+    }
+
+    .progress-track {
+        height: 8px;
     }
 }
+
 
 .btn-icon {
     background: transparent;
