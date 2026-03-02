@@ -884,8 +884,31 @@ function renderList(listId) {
 
     const currentItems = state.items[listId] || [];
 
+    // --- Completion Progress Bar ---
+    const allCheckable = currentItems.filter(i => !i.isHeader);
+    const doneCount = allCheckable.filter(i => i.done).length;
+    const totalCount = allCheckable.length;
+    const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+    const isComplete = totalCount > 0 && pct === 100;
+
+    const progressEl = document.createElement('div');
+    progressEl.className = 'list-progress-bar-container';
+    progressEl.innerHTML = `
+        <div class="list-progress-header">
+            <span class="list-progress-label">${doneCount} / ${totalCount} terminé${doneCount > 1 ? 's' : ''}</span>
+            <span class="list-progress-pct${isComplete ? ' complete' : ''}">${pct}%</span>
+        </div>
+        <div class="list-progress-track">
+            <div class="list-progress-fill${isComplete ? ' complete' : ''}" style="width: ${pct}%"></div>
+        </div>
+    `;
+    tasksContainer.appendChild(progressEl);
+
     if (currentItems.length === 0) {
-        tasksContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 2rem;">Aucun élément. Ajoutez-en un !</div>`;
+        const emptyMsg = document.createElement('div');
+        emptyMsg.style = 'text-align: center; color: var(--text-secondary); padding: 2rem;';
+        emptyMsg.textContent = 'Aucun élément. Ajoutez-en un !';
+        tasksContainer.appendChild(emptyMsg);
     } else {
         // Find if there are any headers
         const hasHeaders = currentItems.some(i => i.isHeader);
