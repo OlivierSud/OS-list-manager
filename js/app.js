@@ -353,8 +353,9 @@ async function fetchSheetData() {
                 // Parse filter if present in first row
                 let savedFilter = list.filter || 'all';
                 if (dataValues[0] && dataValues[0][2]) {
-                    const configStr = dataValues[0][2];
-                    if (configStr.startsWith('FILTER:')) savedFilter = configStr.replace('FILTER:', '');
+                    const firstRowParts = dataValues[0][2].split('|');
+                    const filterPart = firstRowParts.find(p => p.startsWith('FILTER:'));
+                    if (filterPart) savedFilter = filterPart.replace('FILTER:', '');
                 }
 
                 const items = [];
@@ -465,92 +466,21 @@ async function createListInSheet(name) {
     }
 }
 
+// addItemToSheet is kept for reference but all writes now go through syncOrderToSheet
+// to guarantee metadata (UID, PID, STANDALONE, FILTER) is always saved correctly.
 async function addItemToSheet(listId, text, isHeader = false) {
-    if (!accessToken) return;
-
-    const list = state.lists.find(l => l.id === listId);
-    if (!list) return;
-
-    const statusValue = isHeader ? "HEADER" : "FALSE";
-
-    try {
-        const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(list.name)}!A:D:append?valueInputOption=USER_ENTERED`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                values: [[text, statusValue, "", state.userEmail || ""]]
-            })
-        });
-
-        const data = await response.json();
-        if (!data.error) {
-            console.log("Item added");
-            // Optimistic update in UI is handled by addItem() but we should re-fetch to be sure of sync
-            // For responsiveness we keep local update, but background fetch is good practice
-            // fetchSheetData(); 
-        } else {
-            console.error(data.error);
-            console.error("Erreur ajout item: " + data.error.message);
-        }
-    } catch (e) {
-        console.error(e);
-    }
+    // Delegate to full sync so all metadata is preserved
+    await syncOrderToSheet(listId);
 }
 
 async function toggleItemInSheet(listId, itemId, newStatus) {
-    // Determine row index from itemId which is "sheetId-rowIndex"
-    // CAUTION: This simple logic assumes row index matches sheet row index.
-    // Deleting rows would break this. For a robust app, we'd need permanent IDs.
-    // For this prototype, we'll try to update securely.
+    // Update local state modifier
+    const items = state.items[listId];
+    const item = items ? items.find(i => i.id === itemId) : null;
+    if (item) item.lastModifier = state.userEmail || "";
 
-    // Extract row index
-    const rowIndex = parseInt(itemId.split('-')[1]);
-    const list = state.lists.find(l => l.id === listId);
-    const item = state.items[listId].find(i => i.id === itemId);
-
-    // Row index in sheet is 1-based usually for A1 notation, but values array is 0-based.
-    // A1 notation: Sheet!B{rowIndex+1}:D{rowIndex+1}
-    const range = `${list.name}!A${rowIndex + 1}:D${rowIndex + 1}`;
-
-    try {
-        // Prevent toggling headers if somehow triggered
-        // Headers have distinct value so toggling true/false would be bad if we lose "HEADER" status
-        // But UI prevents clicking headers.
-
-        // Preserve standalone status if present
-        let colCValue = "";
-        if (rowIndex === 0) {
-            // For the first row (C1), preserve FILTER and STANDALONE for the item
-            let filterPart = `FILTER:${list.filter}`;
-            let standalonePart = item.isStandalone ? "|STANDALONE" : "";
-            colCValue = `${filterPart}${standalonePart}`;
-        } else {
-            // For other rows, preserve STANDALONE for the item
-            colCValue = item.isStandalone ? "STANDALONE" : "";
-        }
-
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                // Range B:D, update B (status), C (config), and D (email)
-                values: [[newStatus ? "TRUE" : "FALSE", colCValue, state.userEmail || ""]]
-            })
-        });
-
-        // Update local state modifier as well
-        const items = state.items[listId];
-        const item = items.find(i => i.id === itemId);
-        if (item) item.lastModifier = state.userEmail;
-    } catch (e) {
-        console.error("Update failed", e);
-    }
+    // Use full sheet sync to avoid stale row-index issues
+    await syncOrderToSheet(listId);
 }
 
 async function renameSheet(sheetId, newName) {
@@ -1385,7 +1315,7 @@ function addItem() {
     }
 
     const newItem = {
-        id: `${listId}-${Date.now()}`,
+        id: generateId(),
         text: text,
         done: false,
         isHeader: isHeader,
@@ -1395,7 +1325,7 @@ function addItem() {
 
     if (!state.items[listId]) state.items[listId] = [];
 
-    // Insertion Logic
+    // Insertion Logic — always use syncOrderToSheet to persist full metadata
     if (parentId) {
         // Find the selected section and insert after all its current children
         const sectionIndex = items.findIndex(i => i.id === parentId);
@@ -1407,17 +1337,15 @@ function addItem() {
                 insertIndex++;
             }
             state.items[listId].splice(insertIndex, 0, newItem);
-            // Need full sync for middle insertion
-            syncOrderToSheet(listId);
         } else {
             state.items[listId].push(newItem);
-            addItemToSheet(listId, text, isHeader);
         }
     } else {
         // Bottom of list
         state.items[listId].push(newItem);
-        addItemToSheet(listId, text, isHeader);
     }
+    // Single sync call handles all cases with proper metadata
+    syncOrderToSheet(listId);
 
     newTaskInput.value = '';
     if (state.isHeaderMode) toggleHeaderModeState();
@@ -1865,8 +1793,11 @@ async function syncOrderToSheet(listId) {
     const items = state.items[listId];
     const values = items.map((item, idx) => {
         let meta = [];
+
+        // Always save UID for every item (header or not) so IDs are stable across reloads
+        if (item.id) meta.push(`UID:${item.id}`);
+
         if (item.isStandalone) meta.push("STANDALONE");
-        if (item.isHeader && item.id) meta.push(`UID:${item.id}`);
 
         // Recalculate closest preceding header for PID/SECTION
         let currentHeaderId = null;
