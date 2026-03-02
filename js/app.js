@@ -1589,11 +1589,17 @@ function openOptions(e, id, name) {
     modal.style.display = 'flex'; // Ensure flex layout
     modal.classList.remove('hidden');
 
-    // Show list action row
+    // Show list action row ONLY if we are inside a list (Settings gear click)
     if (listActionsRow) {
-        listActionsRow.classList.remove('hidden');
-        listActionsRow.style.display = 'flex';
-        console.log("[Options] Showing list actions row");
+        if (state.view === 'list') {
+            listActionsRow.classList.remove('hidden');
+            listActionsRow.style.display = 'flex';
+            console.log("[Options] Showing list actions row (List View)");
+        } else {
+            listActionsRow.classList.add('hidden');
+            listActionsRow.style.display = 'none';
+            console.log("[Options] Hiding list actions row (Home View)");
+        }
     }
 
     // Initialize list level buttons
