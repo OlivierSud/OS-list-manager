@@ -27,6 +27,10 @@ const btnColor = document.getElementById('btn-color');
 const colorModal = document.getElementById('color-modal');
 const colorGrid = document.getElementById('color-grid');
 const btnColorCancel = document.getElementById('btn-color-cancel');
+const headerProgress = document.getElementById('header-progress');
+const headerProgressLabel = document.getElementById('header-progress-label');
+const headerProgressPct = document.getElementById('header-progress-pct');
+const headerProgressFill = document.getElementById('header-progress-fill');
 
 // User Profile Elements
 const userProfileContainer = document.getElementById('user-profile-container');
@@ -749,6 +753,29 @@ async function saveListFilter(sheetTitle, filterValue) {
 
 // --- Render Functions ---
 
+function updateHeaderProgress(items) {
+    if (!headerProgress) return;
+    const allCheckable = (items || []).filter(i => !i.isHeader);
+    const doneCount = allCheckable.filter(i => i.done).length;
+    const totalCount = allCheckable.length;
+    const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+    const isComplete = totalCount > 0 && pct === 100;
+
+    if (headerProgressLabel) headerProgressLabel.textContent = `${doneCount} / ${totalCount} terminé${doneCount > 1 ? 's' : ''}`;
+    if (headerProgressPct) {
+        headerProgressPct.textContent = `${pct}%`;
+        headerProgressPct.style.color = isComplete ? 'var(--success-color)' : 'var(--accent-color)';
+    }
+    if (headerProgressFill) {
+        headerProgressFill.style.width = `${pct}%`;
+        headerProgressFill.style.background = isComplete
+            ? 'linear-gradient(90deg, var(--success-color), #6ee76f)'
+            : 'linear-gradient(90deg, var(--accent-color), var(--accent-hover))';
+    }
+    headerProgress.classList.remove('hidden');
+}
+
+
 function renderHome() {
     /* Login State Helper */
     if (!accessToken) {
@@ -799,6 +826,7 @@ function renderHome() {
     if (settingsButton) settingsButton.classList.add('hidden'); // Hide settings in home view
     if (filterButton) filterButton.classList.add('hidden'); // Hide filter in home view
     if (searchContainer) searchContainer.classList.add('hidden'); // Hide search in home view
+    if (headerProgress) headerProgress.classList.add('hidden'); // Hide progress bar in home view
 
     // Show PWA banner if available
     if (deferredPrompt && pwaBanner) {
@@ -884,25 +912,8 @@ function renderList(listId) {
 
     const currentItems = state.items[listId] || [];
 
-    // --- Completion Progress Bar ---
-    const allCheckable = currentItems.filter(i => !i.isHeader);
-    const doneCount = allCheckable.filter(i => i.done).length;
-    const totalCount = allCheckable.length;
-    const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
-    const isComplete = totalCount > 0 && pct === 100;
-
-    const progressEl = document.createElement('div');
-    progressEl.className = 'list-progress-bar-container';
-    progressEl.innerHTML = `
-        <div class="list-progress-header">
-            <span class="list-progress-label">${doneCount} / ${totalCount} terminé${doneCount > 1 ? 's' : ''}</span>
-            <span class="list-progress-pct${isComplete ? ' complete' : ''}">${pct}%</span>
-        </div>
-        <div class="list-progress-track">
-            <div class="list-progress-fill${isComplete ? ' complete' : ''}" style="width: ${pct}%"></div>
-        </div>
-    `;
-    tasksContainer.appendChild(progressEl);
+    // --- Completion Progress Bar (header) ---
+    updateHeaderProgress(currentItems);
 
     if (currentItems.length === 0) {
         const emptyMsg = document.createElement('div');

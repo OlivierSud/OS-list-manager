@@ -107,6 +107,22 @@
           <i data-lucide="settings"></i>
         </button>
       </div>
+
+      <!-- Progress bar: shown when a list is open -->
+      <div id="header-progress" class="hidden">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.3rem;">
+          <span id="header-progress-label"
+            style="font-size: 0.72rem; color: var(--text-secondary); letter-spacing: 0.02em;"></span>
+          <span id="header-progress-pct"
+            style="font-size: 0.85rem; font-weight: 700; letter-spacing: -0.02em; transition: color 0.4s;"></span>
+        </div>
+        <div style="height: 3px; background: var(--border-color); border-radius: 99px; overflow: hidden;">
+          <div id="header-progress-fill"
+            style="height: 100%; width: 0%; border-radius: 99px; transition: width 0.5s cubic-bezier(0.4,0,0.2,1);">
+          </div>
+        </div>
+      </div>
+
     </header>
 
     <!-- Main Content -->

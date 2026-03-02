@@ -204,13 +204,20 @@ header {
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    padding: 0.75rem 1rem;
+    padding: 0.75rem 1rem 0 1rem;
     background-color: var(--bg-primary);
     /* Ensure background covers content behind sticky */
     border-bottom: 0.6px solid var(--accent-color);
     overflow: visible !important;
     /* Allow menu to overflow */
 }
+
+/* Progress bar fills the full header width on its own line */
+#header-progress {
+    flex: 0 0 100%;
+    padding: 0.4rem 0 0.5rem 0;
+}
+
 
 /* Specific override for header using glass-panel to ensure dropdowns work */
 header.glass-panel {
