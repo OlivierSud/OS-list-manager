@@ -2688,3 +2688,28 @@ window.onload = function () {
         });
     }
 };
+
+// --- Service Worker Registration with Force Update Detection ---
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js?v=2').then(registration => {
+            console.log('SW Registered with scope:', registration.scope);
+
+            // Check for updates
+            registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        // There's a new version!
+                        console.log('New content detected! Refreshing...');
+                        if (confirm('Une nouvelle version est disponible (sans les points blancs). Voulez-vous rafraîchir maintenant ?')) {
+                            window.location.reload();
+                        }
+                    }
+                });
+            });
+        }).catch(err => {
+            console.error('SW Registration failed:', err);
+        });
+    });
+}
