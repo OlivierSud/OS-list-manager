@@ -781,14 +781,16 @@ function updateHeaderProgress(items) {
         headerProgressFill.classList.toggle('complete', complete);
     }
 
-    // Force immediate and absolute visibility with multiple methods
+    // Robust visibility control for mobile
     headerProgress.classList.remove('hidden');
-    headerProgress.style.setProperty('display', 'flex', 'important');
-    headerProgress.style.visibility = 'visible';
-    headerProgress.style.opacity = '1';
+    headerProgress.classList.add('visible-row');
 
-    // Log state to aid mobile debugging if user checks console
-    console.log(`[ProgressBar] Final visibility: display=${headerProgress.style.display}, opacity=${headerProgress.style.opacity}`);
+    // Clear any previous manual overrides that might lock visibility
+    headerProgress.style.display = '';
+    headerProgress.style.visibility = '';
+    headerProgress.style.opacity = '';
+
+    console.log(`[ProgressBar] Sync: ${done}/${total} (${pct}%). Visible=true`);
 }
 
 
@@ -843,8 +845,9 @@ function renderHome() {
     if (filterButton) filterButton.classList.add('hidden'); // Hide filter in home view
     if (searchContainer) searchContainer.classList.add('hidden'); // Hide search in home view
     if (headerProgress) {
+        headerProgress.classList.remove('visible-row');
         headerProgress.classList.add('hidden');
-        headerProgress.style.display = 'none';
+        headerProgress.style.display = '';
     }
     if (headerControlsRow) {
         headerControlsRow.classList.add('hidden');
