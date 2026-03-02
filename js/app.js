@@ -1189,7 +1189,7 @@ function renderList(listId) {
                             </button>
                     </div>
                     <div style="display: flex; gap: 0.25rem;">
-                        <button class="btn-delete-item" onclick="event.stopPropagation(); deleteListItem(${index})">
+                        <button class="btn-delete-item" onclick="event.stopPropagation(); deleteListItem(${index}, event)">
                             <i data-lucide="x" style="width: 18px; height: 18px;"></i>
                         </button>
                     </div>
@@ -1293,7 +1293,7 @@ function renderList(listId) {
                         ${checkIcon}
                     </div>
                     <span class="item-text" style="flex: 1" onclick="event.stopPropagation(); startInlineEdit(this, ${index})">${item.text}</span>
-                    <button class="btn-delete-item" onclick="event.stopPropagation(); deleteListItem(${index})">
+                    <button class="btn-delete-item" onclick="event.stopPropagation(); deleteListItem(${index}, event)">
                         <i data-lucide="x" style="width: 18px; height: 18px;"></i>
                     </button>
                 `;
@@ -1364,33 +1364,34 @@ function pushAppState(stateObj) {
     }
 }
 
-function deleteListItem(index) {
+function deleteListItem(index, e) {
     const listId = state.activeListId;
     if (!listId && listId !== 0) return;
 
     const items = state.items[listId];
     if (!items || !items[index]) return;
 
-    // Find the item element to animate
-    const itemEl = document.querySelector(`.task-item[data-index="${index}"], .list-header[data-index="${index}"]`);
-
-    if (itemEl) {
-        // Center of explosion is the delete button
-        const btn = itemEl.querySelector('.btn-delete-item');
-        let cx, cy;
-        if (btn) {
-            const b = btn.getBoundingClientRect();
-            cx = b.left + b.width / 2;
-            cy = b.top + b.height / 2;
-        } else {
-            const r = itemEl.getBoundingClientRect();
+    // Center of explosion from event if available, otherwise fallback to bounding rect
+    let cx, cy;
+    if (e && e.clientX && e.clientY) {
+        cx = e.clientX;
+        cy = e.clientY;
+    } else {
+        const itemEl = document.querySelector(`.task-item[data-index="${index}"], .list-header[data-index="${index}"]`);
+        if (itemEl) {
+            const btn = itemEl.querySelector('.btn-delete-item');
+            const r = btn ? btn.getBoundingClientRect() : itemEl.getBoundingClientRect();
             cx = r.left + r.width / 2;
             cy = r.top + r.height / 2;
         }
+    }
 
-        fireExplosionBurst(cx, cy);
+    if (cx && cy) fireExplosionBurst(cx, cy);
+
+    // Visual feedback for item disappearance
+    const itemEl = document.querySelector(`.task-item[data-index="${index}"], .list-header[data-index="${index}"]`);
+    if (itemEl) {
         itemEl.classList.add('exploding');
-
         // Delay real deletion to show animation
         setTimeout(() => {
             // Recheck items in case state changed
