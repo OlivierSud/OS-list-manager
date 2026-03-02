@@ -763,16 +763,14 @@ function updateHeaderProgress(items) {
     const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
     const isComplete = totalCount > 0 && pct === 100;
 
-    if (headerProgressLabel) headerProgressLabel.textContent = `${doneCount} / ${totalCount} terminé${doneCount > 1 ? 's' : ''}`;
+    if (headerProgressLabel) headerProgressLabel.textContent = `${doneCount} / ${totalCount} terminé${doneCount > 1 ? 's' : ''}`;
     if (headerProgressPct) {
         headerProgressPct.textContent = `${pct}%`;
-        headerProgressPct.style.color = isComplete ? 'var(--success-color)' : 'var(--accent-color)';
+        headerProgressPct.classList.toggle('complete', isComplete);
     }
     if (headerProgressFill) {
         headerProgressFill.style.width = `${pct}%`;
-        headerProgressFill.style.background = isComplete
-            ? 'linear-gradient(90deg, var(--success-color), #6ee76f)'
-            : 'linear-gradient(90deg, var(--accent-color), var(--accent-hover))';
+        headerProgressFill.classList.toggle('complete', isComplete);
     }
     headerProgress.classList.remove('hidden');
 }
