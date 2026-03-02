@@ -72,9 +72,11 @@ main {
 
 
 /* Utilities */
+/* Unified visibility helpers */
 .hidden {
-    display: none !important;
+    display: none;
 }
+
 
 .fade-in {
     animation: fadeIn 0.3s ease-out;
@@ -199,20 +201,39 @@ main {
 header {
     position: sticky;
     top: 0;
-    z-index: 100;
+    z-index: 1000;
     display: flex;
     flex-direction: column;
-    padding: 0.75rem 1rem;
+    padding: 10px 14px;
     background-color: var(--bg-primary);
-    border-bottom: 0.6px solid var(--accent-color);
-    gap: 0.75rem;
+    border-bottom: 2px solid var(--accent-color);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+    gap: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: fit-content;
 }
 
 .header-row {
     width: 100%;
     display: flex;
     align-items: center;
+    position: relative;
 }
+
+.progress-row {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 0.5rem;
+    padding-top: 0.25rem;
+}
+
+.hidden {
+    display: none !important;
+}
+
+
 
 .title-row {
     justify-content: flex-start;
@@ -259,13 +280,7 @@ header {
     box-shadow: 0 0 0 2px var(--accent-glow);
 }
 
-/* Progress bar as a row */
-.progress-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.5rem;
-    padding-top: 0.25rem;
-}
+/* Progress bar as a row helper */
 
 .progress-info {
     display: flex;

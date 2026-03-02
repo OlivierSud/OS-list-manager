@@ -756,23 +756,35 @@ async function saveListFilter(sheetTitle, filterValue) {
 // --- Render Functions ---
 
 function updateHeaderProgress(items) {
-    if (!headerProgress) return;
-    const allCheckable = (items || []).filter(i => !i.isHeader);
-    const doneCount = allCheckable.filter(i => i.done).length;
-    const totalCount = allCheckable.length;
-    const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
-    const isComplete = totalCount > 0 && pct === 100;
+    if (!headerProgress) {
+        console.warn("[ProgressBar] Element not found");
+        return;
+    }
+    const checkable = (items || []).filter(i => !i.isHeader);
+    const done = checkable.filter(i => i.done).length;
+    const total = checkable.length;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    const complete = total > 0 && pct === 100;
 
-    if (headerProgressLabel) headerProgressLabel.textContent = `${doneCount} / ${totalCount} terminé${doneCount > 1 ? 's' : ''}`;
+    console.log(`[ProgressBar] Updating: ${done}/${total} (${pct}%)`);
+
+    // Ensure state is set
+    if (headerProgressLabel) headerProgressLabel.textContent = `${done} / ${total} terminé${done > 1 ? 's' : ''}`;
     if (headerProgressPct) {
         headerProgressPct.textContent = `${pct}%`;
-        headerProgressPct.classList.toggle('complete', isComplete);
+        headerProgressPct.classList.toggle('complete', complete);
     }
     if (headerProgressFill) {
         headerProgressFill.style.width = `${pct}%`;
-        headerProgressFill.classList.toggle('complete', isComplete);
+        headerProgressFill.classList.toggle('complete', complete);
     }
-    headerProgress.classList.remove('hidden');
+
+    // Force visibility after a short delay to ensure DOM is ready
+    setTimeout(() => {
+        headerProgress.classList.remove('hidden');
+        headerProgress.style.display = 'flex';
+        console.log("[ProgressBar] Visibility forced to flex.");
+    }, 50);
 }
 
 
@@ -826,8 +838,14 @@ function renderHome() {
     if (settingsButton) settingsButton.classList.add('hidden'); // Hide settings in home view
     if (filterButton) filterButton.classList.add('hidden'); // Hide filter in home view
     if (searchContainer) searchContainer.classList.add('hidden'); // Hide search in home view
-    if (headerProgress) headerProgress.classList.add('hidden'); // Hide progress bar in home view
-    if (headerControlsRow) headerControlsRow.classList.add('hidden'); // Hide controls row in home view
+    if (headerProgress) {
+        headerProgress.classList.add('hidden');
+        headerProgress.style.display = 'none';
+    }
+    if (headerControlsRow) {
+        headerControlsRow.classList.add('hidden');
+        headerControlsRow.style.display = 'none';
+    }
 
     // Show PWA banner if available
     if (deferredPrompt && pwaBanner) {
@@ -894,7 +912,10 @@ function renderList(listId) {
     }
 
     // Show controls row
-    if (headerControlsRow) headerControlsRow.classList.remove('hidden');
+    if (headerControlsRow) {
+        headerControlsRow.classList.remove('hidden');
+        headerControlsRow.style.display = 'flex';
+    }
 
     // Hide PWA banner in list view
     if (pwaBanner) pwaBanner.classList.add('hidden');
