@@ -31,6 +31,8 @@ const headerProgress = document.getElementById('header-progress');
 const headerProgressLabel = document.getElementById('header-progress-label');
 const headerProgressPct = document.getElementById('header-progress-pct');
 const headerProgressFill = document.getElementById('header-progress-fill');
+const headerControlsRow = document.getElementById('header-controls-row');
+const headerTitleRow = document.getElementById('header-title-row');
 
 // User Profile Elements
 const userProfileContainer = document.getElementById('user-profile-container');
@@ -827,6 +829,7 @@ function renderHome() {
     if (filterButton) filterButton.classList.add('hidden'); // Hide filter in home view
     if (searchContainer) searchContainer.classList.add('hidden'); // Hide search in home view
     if (headerProgress) headerProgress.classList.add('hidden'); // Hide progress bar in home view
+    if (headerControlsRow) headerControlsRow.classList.add('hidden'); // Hide controls row in home view
 
     // Show PWA banner if available
     if (deferredPrompt && pwaBanner) {
@@ -886,7 +889,14 @@ function renderList(listId) {
     fab.classList.add('hidden'); // Hide FAB, we use the input bar instead
     if (settingsButton) settingsButton.classList.remove('hidden'); // Show settings button in list view
     if (filterButton) filterButton.classList.remove('hidden'); // Show filter button in list view
-    if (searchContainer) searchContainer.classList.remove('hidden'); // Show search in list view
+    if (searchContainer) {
+        searchContainer.classList.remove('hidden');
+        // No longer need to constrain width, it grows to fill row
+        if (searchInput) searchInput.style.width = '100%';
+    }
+
+    // Show controls row
+    if (headerControlsRow) headerControlsRow.classList.remove('hidden');
 
     // Hide PWA banner in list view
     if (pwaBanner) pwaBanner.classList.add('hidden');

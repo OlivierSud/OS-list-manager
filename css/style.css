@@ -201,28 +201,106 @@ header {
     top: 0;
     z-index: 100;
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem 1rem 0 1rem;
+    flex-direction: column;
+    padding: 0.75rem 1rem;
     background-color: var(--bg-primary);
-    /* Ensure background covers content behind sticky */
     border-bottom: 0.6px solid var(--accent-color);
-    overflow: visible !important;
-    /* Allow menu to overflow */
+    gap: 0.75rem;
 }
 
-/* Progress bar fills the full header width on its own line */
-#header-progress {
-    flex: 0 0 100%;
-    padding: 0.4rem 0 0.5rem 0;
+.header-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
 }
 
+.title-row {
+    justify-content: flex-start;
+}
+
+.controls-row {
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+#search-container {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+#search-container i {
+    position: absolute;
+    left: 10px;
+    width: 14px;
+    height: 14px;
+    color: var(--text-secondary);
+    pointer-events: none;
+}
+
+#search-input {
+    width: 100%;
+    background: var(--bg-dark);
+    border: 0.6px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-md);
+    padding: 6px 12px 6px 32px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    height: 36px;
+}
+
+#search-input:focus {
+    border-color: var(--accent-color);
+}
+
+/* Progress bar as a row */
+.progress-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.4rem;
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#header-progress-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+#header-progress-pct {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--accent-color);
+}
+
+.progress-track {
+    height: 6px;
+    background: var(--border-color);
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+#header-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent-color), var(--accent-hover));
+    border-radius: 99px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
 /* Specific override for header using glass-panel to ensure dropdowns work */
 header.glass-panel {
     overflow: visible !important;
 }
+
 
 h1 {
     margin: 0;
@@ -717,52 +795,7 @@ header>div:last-child {
     transition: background 0.3s ease;
 }
 
-/* List Completion Progress Bar */
-.list-progress-bar-container {
-    padding: 0.6rem 0.25rem 0.85rem 0.25rem;
-    margin-bottom: 0.25rem;
-}
-
-.list-progress-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 0.4rem;
-}
-
-.list-progress-label {
-    font-size: 0.78rem;
-    color: var(--text-secondary);
-    letter-spacing: 0.02em;
-}
-
-.list-progress-pct {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--accent-color);
-    letter-spacing: -0.02em;
-    transition: color 0.4s ease;
-}
-
-.list-progress-pct.complete {
-    color: var(--success-color);
-}
-
-.list-progress-track {
-    height: 5px;
-    background: var(--border-color);
-    border-radius: 99px;
-    overflow: hidden;
-}
-
-.list-progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--accent-color), var(--accent-hover));
-    border-radius: 99px;
-    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-    min-width: 0;
-}
-
-.list-progress-fill.complete {
-    background: linear-gradient(90deg, var(--success-color), #6ee76f);
+/* Row visibility helper */
+.header-row.hidden {
+    display: none !important;
 }

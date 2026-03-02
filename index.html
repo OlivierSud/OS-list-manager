@@ -57,72 +57,68 @@
 
     <!-- Header -->
     <header class="glass-panel">
-      <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <button id="back-button" class="btn-icon hidden" onclick="goHome()">
-          <i data-lucide="arrow-left"></i>
-        </button>
+      <!-- Row 1: Back + Title + Avatar + Refresh -->
+      <div id="header-title-row" class="header-row title-row">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <button id="back-button" class="btn-icon hidden" onclick="goHome()">
+            <i data-lucide="arrow-left"></i>
+          </button>
 
-        <h1 id="header-title">Mes Listes</h1>
+          <h1 id="header-title">Mes Listes</h1>
 
-        <div id="user-profile-container" class="hidden"
-          style="position: relative; display: flex; align-items: center; margin-left: 0.5rem;">
-          <img id="user-avatar" src="" alt="Profil" class="hidden"
-            style="width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid var(--accent-color); object-fit: cover;">
-          <div id="user-avatar-fallback" class="hidden"
-            style="width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid var(--accent-color); background: var(--bg-secondary); display: flex; align-items: center; justify-content: center;">
-            <i data-lucide="user" style="width: 16px; height: 16px; color: var(--text-primary);"></i>
+          <div id="user-profile-container" class="hidden"
+            style="position: relative; display: flex; align-items: center; margin-left: 0.5rem;">
+            <img id="user-avatar" src="" alt="Profil" class="hidden"
+              style="width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid var(--accent-color); object-fit: cover;">
+            <div id="user-avatar-fallback" class="hidden"
+              style="width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid var(--accent-color); background: var(--bg-secondary); display: flex; align-items: center; justify-content: center;">
+              <i data-lucide="user" style="width: 16px; height: 16px; color: var(--text-primary);"></i>
+            </div>
+
+            <!-- Logout Menu -->
+            <div id="user-menu" class="hidden glass-panel"
+              style="position: absolute; top: 120%; right: 0; min-width: max-content; padding: 0.5rem; z-index: 1000; animation: fadeIn 0.1s ease-out;">
+              <button id="btn-logout-header" class="btn-icon"
+                style="width: 100%; justify-content: flex-start; color: var(--danger-color); font-size: 0.9rem; white-space: nowrap;">
+                <i data-lucide="log-out" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Déconnexion /
+                Changer
+              </button>
+            </div>
           </div>
 
-          <!-- Logout Menu -->
-          <div id="user-menu" class="hidden glass-panel"
-            style="position: absolute; top: 120%; right: 0; min-width: max-content; padding: 0.5rem; z-index: 1000; animation: fadeIn 0.1s ease-out;">
-            <button id="btn-logout-header" class="btn-icon"
-              style="width: 100%; justify-content: flex-start; color: var(--danger-color); font-size: 0.9rem; white-space: nowrap;">
-              <i data-lucide="log-out" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Déconnexion /
-              Changer
-            </button>
-          </div>
-        </div>
-
-        <!-- place refresh next to avatar so it's on same line -->
-        <button id="refresh-button" class="btn-icon hidden" title="Rafraîchir l'application" onclick="refreshApp()"
-          style="margin-left: 0.5rem;">
-          <i data-lucide="refresh-cw"></i>
-        </button>
-
-      </div>
-
-      <div style="display: flex; gap: 0.25rem; align-items: center;">
-        <div id="search-container" class="hidden" style="position: relative; margin-right: 0.5rem;">
-          <i data-lucide="search"
-            style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-secondary);"></i>
-          <input type="text" id="search-input" placeholder="Rechercher..."
-            style="background: var(--bg-dark); border: 0.6px solid var(--border-color); color: var(--text-primary); border-radius: 4px; padding: 4px 8px 4px 28px; font-size: 13px; width: 100px; outline: none; transition: width 0.3s; height: 28px;">
-        </div>
-        <button id="filter-button" class="btn-icon hidden">
-          <i data-lucide="filter"></i>
-        </button>
-
-        <button id="settings-button" class="btn-icon">
-          <i data-lucide="settings"></i>
-        </button>
-      </div>
-
-      <!-- Progress bar: shown when a list is open -->
-      <div id="header-progress" class="hidden">
-        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.3rem;">
-          <span id="header-progress-label"
-            style="font-size: 0.72rem; color: var(--text-secondary); letter-spacing: 0.02em;"></span>
-          <span id="header-progress-pct"
-            style="font-size: 0.85rem; font-weight: 700; letter-spacing: -0.02em; transition: color 0.4s;"></span>
-        </div>
-        <div style="height: 3px; background: var(--border-color); border-radius: 99px; overflow: hidden;">
-          <div id="header-progress-fill"
-            style="height: 100%; width: 0%; border-radius: 99px; transition: width 0.5s cubic-bezier(0.4,0,0.2,1);">
-          </div>
+          <button id="refresh-button" class="btn-icon hidden" title="Rafraîchir l'application" onclick="refreshApp()"
+            style="margin-left: 0.5rem;">
+            <i data-lucide="refresh-cw"></i>
+          </button>
         </div>
       </div>
 
+      <!-- Row 2: Search + Filter + Settings -->
+      <div id="header-controls-row" class="header-row controls-row">
+        <div id="search-container" class="hidden">
+          <i data-lucide="search"></i>
+          <input type="text" id="search-input" placeholder="Rechercher...">
+        </div>
+        <div style="display: flex; gap: 0.25rem;">
+          <button id="filter-button" class="btn-icon hidden">
+            <i data-lucide="filter"></i>
+          </button>
+          <button id="settings-button" class="btn-icon">
+            <i data-lucide="settings"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Row 3: Progress bar: shown when a list is open -->
+      <div id="header-progress" class="header-row progress-row hidden">
+        <div class="progress-info">
+          <span id="header-progress-label"></span>
+          <span id="header-progress-pct"></span>
+        </div>
+        <div class="progress-track">
+          <div id="header-progress-fill"></div>
+        </div>
+      </div>
     </header>
 
     <!-- Main Content -->
