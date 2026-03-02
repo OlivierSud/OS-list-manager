@@ -1410,7 +1410,13 @@ function deleteListItem(index, e) {
 }
 
 function fireExplosionBurst(x, y) {
-    const colors = ['#ef4444', '#eb7600', '#ffffff', '#ffeb3b', '#4b4b4b'];
+    // Mostly shades of red with some white/yellow for peak brilliance
+    const colors = [
+        '#ff0000', '#d32f2f', '#f44336', '#b71c1c', '#ff5252', // Red shades
+        '#ffffff', // White
+        '#ffeb3b', // Yellow
+        '#d32f2f', '#ff0000', '#b71c1c' // More reds
+    ];
     // Double particle count for better visibility
     for (let i = 0; i < 40; i++) {
         const p = document.createElement('div');
@@ -2716,8 +2722,8 @@ window.onload = function () {
 // --- Service Worker Registration with Force Update Detection ---
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js?v=2').then(registration => {
-            console.log('SW Registered with scope:', registration.scope);
+        navigator.serviceWorker.register('sw.js?v=4').then(registration => {
+            console.log('SW Registered (v4)');
 
             // Check for updates
             registration.addEventListener('updatefound', () => {

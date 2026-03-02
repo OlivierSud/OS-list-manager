@@ -1,4 +1,4 @@
-const CACHE_NAME = 'os-list-v3';
+const CACHE_NAME = 'os-list-v4';
 const ASSETS = [
     './',
     './index.html',
