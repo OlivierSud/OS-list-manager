@@ -156,7 +156,8 @@ let state = {
     filter: 'all',
     searchQuery: '',
     userEmail: null,
-    userPicture: null
+    userPicture: null,
+    completedLists: new Set() // Track which lists have triggered confetti
 };
 
 // PWA Install Prompt
@@ -781,6 +782,24 @@ function updateHeaderProgress(items) {
         headerProgressFill.classList.toggle('complete', complete);
     }
 
+    // Celebrate at 100%
+    if (complete && !state.completedLists.has(state.activeListId)) {
+        fireConfetti(3500);
+        state.completedLists.add(state.activeListId);
+    } else if (!complete) {
+        state.completedLists.delete(state.activeListId);
+    }
+
+    // FIRE SPARKS only on movement (when updating)
+    if (!complete && pct > 0) {
+        fireSparks(12); // Emit a burst of sparks
+    }
+
+    // Ludic "Pop" Animation on update
+    headerProgress.classList.remove('hit-animate');
+    void headerProgress.offsetWidth; // Force reflow
+    headerProgress.classList.add('hit-animate');
+
     // Robust visibility control for mobile
     headerProgress.classList.remove('hidden');
     headerProgress.classList.add('visible-row');
@@ -791,6 +810,68 @@ function updateHeaderProgress(items) {
     headerProgress.style.opacity = '';
 
     console.log(`[ProgressBar] Sync: ${done}/${total} (${pct}%). Visible=true`);
+}
+
+function fireSparks(count) {
+    if (!headerProgressFill) return;
+
+    // Create several random sparks at the tip
+    for (let i = 0; i < count; i++) {
+        const spark = document.createElement('div');
+        spark.className = 'spark-particle';
+
+        // Random direction and delay for a natural feel
+        const dx = (Math.random() * 60 + 20) * (Math.random() > 0.5 ? 1 : -1);
+        const dy = (Math.random() * 40 + 10) * (Math.random() > 0.5 ? 1 : -1);
+        const duration = 0.5 + Math.random() * 0.5;
+        const delay = Math.random() * 0.3; // Stagger sparks
+
+        spark.style.setProperty('--dx', `${dx}px`);
+        spark.style.setProperty('--dy', `${dy}px`);
+        spark.style.right = '-2px';
+        spark.style.top = `${20 + Math.random() * 60}%`;
+        spark.style.animation = `spark-burn ${duration}s ease-out ${delay}s forwards`;
+
+        headerProgressFill.appendChild(spark);
+        setTimeout(() => spark.remove(), (duration + delay) * 1000);
+    }
+}
+
+function fireConfetti(durationMs) {
+    const end = Date.now() + durationMs;
+    const colors = ['#eb7600', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444', '#f59e0b', '#fff'];
+
+    const interval = setInterval(() => {
+        if (Date.now() > end) {
+            clearInterval(interval);
+            return;
+        }
+
+        // Spawn 3 particles per interval
+        for (let i = 0; i < 3; i++) {
+            const confetti = document.createElement('div');
+            confetti.className = 'confetti-particle';
+
+            const startX = Math.random() * window.innerWidth;
+            const size = Math.random() * 8 + 6;
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            const delay = Math.random() * 0.5;
+
+            confetti.style.left = startX + 'px';
+            confetti.style.top = '-20px';
+            confetti.style.width = size + 'px';
+            confetti.style.height = (size * 1.2) + 'px';
+            confetti.style.backgroundColor = color;
+            confetti.style.opacity = Math.random() * 0.5 + 0.5;
+            confetti.style.boxShadow = `0 0 10px ${color}`;
+            confetti.style.animation = `confetti-fall ${Math.random() * 2 + 1.5}s linear forwards`;
+            confetti.style.animationDelay = delay + 's';
+
+            document.body.appendChild(confetti);
+
+            setTimeout(() => confetti.remove(), 4000);
+        }
+    }, 100);
 }
 
 
