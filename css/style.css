@@ -481,39 +481,6 @@ header {
     }
 }
 
-/* Bubbles inside liquid */
-#header-progress-fill::before {
-    content: '...';
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 28px;
-    letter-spacing: 15px;
-    position: absolute;
-    top: -10px;
-    left: 10%;
-    animation: bubbles-float 2.5s infinite linear;
-    text-shadow: 20px 10px 0 rgba(255, 255, 255, 0.4), 45px -5px 0 rgba(255, 255, 255, 0.3);
-}
-
-@keyframes bubbles-float {
-    0% {
-        transform: translateX(0) translateY(0);
-        opacity: 0;
-    }
-
-    20% {
-        opacity: 0.8;
-    }
-
-    80% {
-        opacity: 0.8;
-    }
-
-    100% {
-        transform: translateX(80px) translateY(-12px);
-        opacity: 0;
-    }
-}
-
 /* Confetti particles for 100% celebration */
 .confetti-particle {
     position: fixed;
@@ -1093,4 +1060,52 @@ h1 {
 /* Row visibility helper */
 .header-row.hidden {
     display: none !important;
+}
+
+/* Item Explosion Animation */
+.exploding {
+    animation: item-implode 0.4s cubic-bezier(0.1, 0.7, 0.1, 1) forwards;
+    pointer-events: none;
+}
+
+@keyframes item-implode {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+        filter: brightness(1);
+    }
+
+    30% {
+        transform: scale(1.1) rotate(2deg);
+        filter: brightness(2);
+    }
+
+    100% {
+        transform: scale(0.4) rotate(-4deg);
+        opacity: 0;
+        filter: brightness(3);
+    }
+}
+
+.explosion-particle {
+    position: fixed;
+    width: 8px;
+    height: 8px;
+    z-index: 10000;
+    pointer-events: none;
+    border-radius: 50%;
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.6);
+}
+
+@keyframes explosion-fly {
+    0% {
+        transform: translate(0, 0) scale(2);
+        opacity: 1;
+        filter: brightness(1.5);
+    }
+
+    100% {
+        transform: translate(var(--dx), var(--dy)) scale(0);
+        opacity: 0;
+    }
 }

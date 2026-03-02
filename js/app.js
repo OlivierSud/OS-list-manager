@@ -1371,9 +1371,68 @@ function deleteListItem(index) {
     const items = state.items[listId];
     if (!items || !items[index]) return;
 
-    items.splice(index, 1);
-    renderList(listId);
-    syncOrderToSheet(listId);
+    // Find the item element to animate
+    const itemEl = document.querySelector(`.task-item[data-index="${index}"], .list-header[data-index="${index}"]`);
+
+    if (itemEl) {
+        // Center of explosion is the delete button
+        const btn = itemEl.querySelector('.btn-delete-item');
+        let cx, cy;
+        if (btn) {
+            const b = btn.getBoundingClientRect();
+            cx = b.left + b.width / 2;
+            cy = b.top + b.height / 2;
+        } else {
+            const r = itemEl.getBoundingClientRect();
+            cx = r.left + r.width / 2;
+            cy = r.top + r.height / 2;
+        }
+
+        fireExplosionBurst(cx, cy);
+        itemEl.classList.add('exploding');
+
+        // Delay real deletion to show animation
+        setTimeout(() => {
+            // Recheck items in case state changed
+            const freshItems = state.items[listId];
+            if (freshItems && freshItems[index]) {
+                freshItems.splice(index, 1);
+                renderList(listId);
+                syncOrderToSheet(listId);
+            }
+        }, 360);
+    } else {
+        items.splice(index, 1);
+        renderList(listId);
+        syncOrderToSheet(listId);
+    }
+}
+
+function fireExplosionBurst(x, y) {
+    const colors = ['#ef4444', '#eb7600', '#ffffff', '#ffeb3b', '#4b4b4b'];
+    // Double particle count for better visibility
+    for (let i = 0; i < 40; i++) {
+        const p = document.createElement('div');
+        p.className = 'explosion-particle';
+
+        // Wider dispersion range
+        const dx = (Math.random() * 240 - 120);
+        const dy = (Math.random() * 260 - 130);
+        const size = Math.random() * 8 + 4;
+        const delay = Math.random() * 0.1; // Slight stagger
+
+        p.style.left = x + 'px';
+        p.style.top = y + 'px';
+        p.style.width = size + 'px';
+        p.style.height = size + 'px';
+        p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        p.style.setProperty('--dx', `${dx}px`);
+        p.style.setProperty('--dy', `${dy}px`);
+        p.style.animation = `explosion-fly ${Math.random() * 0.4 + 0.4}s cubic-bezier(0.1, 0.8, 0.3, 1) ${delay}s forwards`;
+
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 1000);
+    }
 }
 
 function startInlineEdit(element, index) {
