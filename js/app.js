@@ -33,6 +33,9 @@ const headerProgressPct = document.getElementById('header-progress-pct');
 const headerProgressFill = document.getElementById('header-progress-fill');
 const headerControlsRow = document.getElementById('header-controls-row');
 const headerTitleRow = document.getElementById('header-title-row');
+const btnCheckAll = document.getElementById('btn-check-all');
+const btnUncheckAll = document.getElementById('btn-uncheck-all');
+const listActionsRow = document.getElementById('list-actions-row');
 
 // User Profile Elements
 const userProfileContainer = document.getElementById('user-profile-container');
@@ -757,7 +760,7 @@ async function saveListFilter(sheetTitle, filterValue) {
 
 function updateHeaderProgress(items) {
     if (!headerProgress) {
-        console.warn("[ProgressBar] Element not found");
+        console.warn("[ProgressBar] Element 'header-progress' not found");
         return;
     }
     const checkable = (items || []).filter(i => !i.isHeader);
@@ -766,9 +769,8 @@ function updateHeaderProgress(items) {
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
     const complete = total > 0 && pct === 100;
 
-    console.log(`[ProgressBar] Updating: ${done}/${total} (${pct}%)`);
+    console.log(`[ProgressBar] Syncing for List ID: ${state.activeListId} with ${items ? items.length : 0} items. Calc: ${done}/${total} (${pct}%)`);
 
-    // Ensure state is set
     if (headerProgressLabel) headerProgressLabel.textContent = `${done} / ${total} terminé${done > 1 ? 's' : ''}`;
     if (headerProgressPct) {
         headerProgressPct.textContent = `${pct}%`;
@@ -779,12 +781,14 @@ function updateHeaderProgress(items) {
         headerProgressFill.classList.toggle('complete', complete);
     }
 
-    // Force visibility after a short delay to ensure DOM is ready
-    setTimeout(() => {
-        headerProgress.classList.remove('hidden');
-        headerProgress.style.display = 'flex';
-        console.log("[ProgressBar] Visibility forced to flex.");
-    }, 50);
+    // Force immediate and absolute visibility with multiple methods
+    headerProgress.classList.remove('hidden');
+    headerProgress.style.setProperty('display', 'flex', 'important');
+    headerProgress.style.visibility = 'visible';
+    headerProgress.style.opacity = '1';
+
+    // Log state to aid mobile debugging if user checks console
+    console.log(`[ProgressBar] Final visibility: display=${headerProgress.style.display}, opacity=${headerProgress.style.opacity}`);
 }
 
 
@@ -1440,6 +1444,51 @@ function openOptions(e, id, name) {
     // Explicitly unhide if it was hidden
     modal.style.display = 'flex'; // Ensure flex layout
     modal.classList.remove('hidden');
+
+    // Show list action row
+    if (listActionsRow) {
+        listActionsRow.classList.remove('hidden');
+        listActionsRow.style.display = 'flex';
+        console.log("[Options] Showing list actions row");
+    }
+
+    // Initialize list level buttons
+    if (btnCheckAll) {
+        btnCheckAll.onclick = (ev) => {
+            ev.stopPropagation();
+            checkAllItems(id, true);
+        };
+    }
+    if (btnUncheckAll) {
+        btnUncheckAll.onclick = (ev) => {
+            ev.stopPropagation();
+            checkAllItems(id, false);
+        };
+    }
+
+    if (btnRename) btnRename.classList.remove('hidden');
+    if (btnDuplicate) btnDuplicate.classList.remove('hidden');
+    if (btnColor) btnColor.classList.remove('hidden');
+    if (btnDelete) btnDelete.classList.remove('hidden');
+}
+
+function checkAllItems(listId, status) {
+    const list = state.lists.find(l => l.id === listId);
+    const listName = list ? list.name : "cette liste";
+    const action = status ? "cocher" : "décocher";
+
+    if (confirm(`Voulez-vous ${action} tous les éléments de "${listName}" ? L'état actuel sera réinitialisé.`)) {
+        const items = state.items[listId] || [];
+        items.forEach(item => {
+            if (!item.isHeader) {
+                item.done = status;
+            }
+        });
+
+        renderList(listId);
+        syncOrderToSheet(listId);
+        closeOptions();
+    }
 }
 
 function closeOptions() {
@@ -1489,8 +1538,9 @@ function openSectionOptions(index) {
     };
 
     // Hide duplicate for section
-    btnDuplicate.classList.add('hidden');
-    btnLogout.classList.add('hidden');
+    if (btnDuplicate) btnDuplicate.classList.add('hidden');
+    if (btnLogout) btnLogout.classList.add('hidden');
+    if (listActionsRow) listActionsRow.classList.add('hidden');
 
     modal.style.display = 'flex';
     modal.classList.remove('hidden');

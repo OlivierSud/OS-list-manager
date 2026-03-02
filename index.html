@@ -158,11 +158,13 @@
 
     <!-- Action Sheet / Modal -->
     <div id="action-modal" class="hidden"
-      style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 200; backdrop-filter: blur(4px);">
+      style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(8px);">
       <div class="glass-panel"
-        style="width: 90%; max-width: 320px; padding: 1.5rem; background: #1e293b; border: 0.6px solid var(--border-color);">
-        <h3 id="modal-title" style="margin-top:0; margin-bottom: 0.5rem;">Options</h3>
-        <p id="modal-desc" style="margin: 0 0 1.5rem 0; color: var(--text-secondary); font-size: 0.9rem;"></p>
+        style="width: 92%; max-width: 340px; padding: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border-color); box-shadow: 0 10px 40px rgba(0,0,0,0.8); border-radius: var(--radius-lg);">
+        <h3 id="modal-title"
+          style="margin-top:0; margin-bottom: 0.5rem; font-size: 1.2rem; color: var(--accent-color);">Options</h3>
+        <p id="modal-desc"
+          style="margin: 0 0 1.5rem 0; color: var(--text-secondary); font-size: 0.85rem; letter-spacing: 0.01em;"></p>
 
         <div style="display: flex; flex-direction: column; gap: 0.75rem;">
           <button id="btn-rename" class="btn-icon"
@@ -185,6 +187,17 @@
             <i data-lucide="trash-2"></i> Supprimer
           </button>
 
+          <div id="list-actions-row" style="display: flex; gap: 0.75rem;">
+            <button id="btn-check-all" class="btn-icon"
+              style="flex: 1; border-radius: 0.5rem; justify-content: center; gap: 0.5rem; font-size: 0.9rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.1); color: var(--success-color); border: 0.6px solid rgba(16, 185, 129, 0.2);">
+              <i data-lucide="check-square" style="width: 16px; height: 16px;"></i> Tout cocher
+            </button>
+            <button id="btn-uncheck-all" class="btn-icon"
+              style="flex: 1; border-radius: 0.5rem; justify-content: center; gap: 0.5rem; font-size: 0.9rem; padding: 0.75rem; background: rgba(255, 255, 255, 0.05);">
+              <i data-lucide="square" style="width: 16px; height: 16px;"></i> Tout décocher
+            </button>
+          </div>
+
           <hr style="border: none; border-top: 0.6px solid var(--border-color); margin: 0.5rem 0;">
 
           <button id="btn-cancel" class="btn-icon"
@@ -197,10 +210,11 @@
 
     <!-- Color Picker Modal -->
     <div id="color-modal" class="hidden"
-      style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 201; backdrop-filter: blur(4px);">
+      style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1001; backdrop-filter: blur(8px);">
       <div class="glass-panel"
-        style="width: 90%; max-width: 320px; padding: 1.5rem; background: #1e293b; border: 0.6px solid var(--border-color);">
-        <h3 style="margin-top:0; margin-bottom: 1rem;">Choisir une couleur</h3>
+        style="width: 92%; max-width: 320px; padding: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border-color); box-shadow: 0 10px 40px rgba(0,0,0,0.8); border-radius: var(--radius-lg);">
+        <h3 style="margin-top:0; margin-bottom: 1rem; color: var(--text-primary); font-size: 1.1rem;">Choisir une
+          couleur</h3>
 
         <div id="color-grid"
           style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.75rem; margin-bottom: 1.5rem;">
