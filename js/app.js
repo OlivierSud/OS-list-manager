@@ -1593,11 +1593,11 @@ function openOptions(e, id, name) {
     if (listActionsRow) {
         if (state.view === 'list') {
             listActionsRow.classList.remove('hidden');
-            listActionsRow.style.display = 'flex';
+            listActionsRow.style.setProperty('display', 'flex', 'important');
             console.log("[Options] Showing list actions row (List View)");
         } else {
             listActionsRow.classList.add('hidden');
-            listActionsRow.style.display = 'none';
+            listActionsRow.style.setProperty('display', 'none', 'important');
             console.log("[Options] Hiding list actions row (Home View)");
         }
     }
@@ -1620,6 +1620,12 @@ function openOptions(e, id, name) {
     if (btnDuplicate) btnDuplicate.classList.remove('hidden');
     if (btnColor) btnColor.classList.remove('hidden');
     if (btnDelete) btnDelete.classList.remove('hidden');
+
+    // Ultimate fallback for individual buttons hiding on Home View
+    if (state.view !== 'list') {
+        if (btnCheckAll) btnCheckAll.classList.add('hidden');
+        if (btnUncheckAll) btnUncheckAll.classList.add('hidden');
+    }
 }
 
 function checkAllItems(listId, status) {

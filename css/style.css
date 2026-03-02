@@ -273,8 +273,8 @@ header {
 }
 
 #list-actions-row {
-    width: 100% !important;
-    display: flex !important;
+    width: 100%;
+    display: flex;
     margin-top: 0.5rem;
 }
 
