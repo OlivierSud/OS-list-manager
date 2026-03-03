@@ -124,6 +124,24 @@ main {
     }
 }
 
+.page-reveal {
+    animation: pageReveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes pageReveal {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.98);
+        filter: blur(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+    }
+}
+
 .btn-delete-item {
     background: rgba(239, 68, 68, 0.2);
     border: 1px solid rgba(239, 68, 68, 0.3);
@@ -1107,5 +1125,51 @@ h1 {
     100% {
         transform: translate(var(--dx), var(--dy)) scale(0);
         opacity: 0;
+    }
+}
+
+/* Magic Reveal Particles */
+.magic-particle {
+    position: fixed;
+    border-radius: 50%;
+    z-index: 10001;
+    pointer-events: none;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+    background: white;
+}
+
+@keyframes curtain-fall {
+    0% {
+        transform: translateY(0) scale(0);
+        opacity: 0;
+    }
+
+    10% {
+        opacity: 1;
+        transform: translateY(5vh) scale(1.2);
+    }
+
+    100% {
+        transform: translateY(110vh) scale(0.5);
+        opacity: 0;
+    }
+}
+
+/* Enhanced Page Reveal with Glow - Adjusted for Curtain */
+@keyframes pageReveal {
+    0% {
+        opacity: 0;
+        transform: scale(0.98);
+        filter: blur(10px) brightness(0.8);
+    }
+
+    40% {
+        opacity: 0.3;
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1);
+        filter: blur(0) brightness(1);
     }
 }

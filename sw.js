@@ -1,10 +1,15 @@
-const CACHE_NAME = 'os-list-v4';
+const CACHE_NAME = 'os-list-v6';
 const ASSETS = [
     './',
     './index.html',
     './css/style.css',
     './js/app.js',
-    './manifest.webmanifest'
+    './manifest.webmanifest',
+    './sounds/check.mp3',
+    './sounds/finished.mp3',
+    './sounds/remove.mp3',
+    './sounds/add.mp3',
+    './sounds/refresh.mp3'
 ];
 
 self.addEventListener('install', (event) => {

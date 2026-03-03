@@ -200,6 +200,22 @@ function generateId() {
     return Math.random().toString(36).substring(2, 9);
 }
 
+// Audio Manager
+const sounds = {
+    check: new Audio('./sounds/check.mp3'),
+    finished: new Audio('./sounds/finished.mp3'),
+    remove: new Audio('./sounds/remove.mp3'),
+    add: new Audio('./sounds/add.mp3'),
+    refresh: new Audio('./sounds/refresh.mp3')
+};
+
+function playSound(name) {
+    if (sounds[name]) {
+        sounds[name].currentTime = 0;
+        sounds[name].play().catch(e => console.log('Sound play blocked:', e));
+    }
+}
+
 // --- Google Sheets & Auth Integration ---
 // TODO: User must replace this with their own OAuth 2.0 Client ID from Google Cloud Console
 const CLIENT_ID = '356152485310-ofia0pr8hcig7s906tfu1c9v1us7s4gb.apps.googleusercontent.com';
@@ -785,6 +801,7 @@ function updateHeaderProgress(items) {
     // Celebrate at 100%
     if (complete && !state.completedLists.has(state.activeListId)) {
         fireConfetti(3500);
+        playSound('finished');
         state.completedLists.add(state.activeListId);
     } else if (!complete) {
         state.completedLists.delete(state.activeListId);
@@ -1232,6 +1249,7 @@ function renderList(listId) {
                                     state.selectedSectionId = null;
                                 } else {
                                     state.selectedSectionId = item.id;
+                                    playSound('add');
                                 }
                                 renderList(state.activeListId);
                             });
@@ -1330,6 +1348,9 @@ function openList(id) {
 // Refresh app by clearing caches and unregistering service workers, then reload.
 async function refreshApp() {
     try {
+        // Set flag to play sound AFTER reload
+        localStorage.setItem('play_refresh_sound', 'true');
+
         // Clear Cache Storage entries
         if ('caches' in window) {
             const keys = await caches.keys();
@@ -1387,6 +1408,7 @@ function deleteListItem(index, e) {
     }
 
     if (cx && cy) fireExplosionBurst(cx, cy);
+    playSound('remove');
 
     // Visual feedback for item disappearance
     const itemEl = document.querySelector(`.task-item[data-index="${index}"], .list-header[data-index="${index}"]`);
@@ -1439,6 +1461,37 @@ function fireExplosionBurst(x, y) {
 
         document.body.appendChild(p);
         setTimeout(() => p.remove(), 1000);
+    }
+}
+
+function fireCurtainParticles() {
+    const colors = ['#eb7600', '#fff']; // Restricted palette: Blender Orange and White
+    const count = 250; // Dense curtain effect
+
+    for (let i = 0; i < count; i++) {
+        const p = document.createElement('div');
+        p.className = 'magic-particle'; // Keep the same class as it has the shadow/bg styles
+
+        const size = Math.random() * 5 + 2; // Slightly smaller for higher density without clutter
+        const color = colors[Math.floor(Math.random() * colors.length)];
+
+        // Random horizontal position
+        const startX = Math.random() * window.innerWidth;
+        const startY = -20 - (Math.random() * 50); // Stagger the start Y slightly
+
+        p.style.left = startX + 'px';
+        p.style.top = startY + 'px';
+        p.style.width = size + 'px';
+        p.style.height = size + 'px';
+        p.style.backgroundColor = color;
+        p.style.boxShadow = `0 0 12px ${color}`;
+
+        const duration = 2.0 + Math.random() * 1.5;
+        const delay = Math.random() * 0.8; // More delay spread
+        p.style.animation = `curtain-fall ${duration}s ease-in ${delay}s forwards`;
+
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), (duration + delay) * 1000);
     }
 }
 
@@ -1501,6 +1554,7 @@ function toggleItem(itemId) {
 
     if (item) {
         item.done = !item.done;
+        if (item.done) playSound('check');
         renderList(listId); // Re-render to update UI
 
         // Sync with Cloud
@@ -1563,6 +1617,7 @@ function addItem() {
     }
     // Single sync call handles all cases with proper metadata
     syncOrderToSheet(listId);
+    playSound('add');
 
     newTaskInput.value = '';
     if (state.isHeaderMode) toggleHeaderModeState();
@@ -1656,6 +1711,7 @@ function checkAllItems(listId, status) {
             }
         });
 
+        if (status) playSound('check');
         renderList(listId);
         syncOrderToSheet(listId);
         closeOptions();
@@ -2170,6 +2226,7 @@ if (newTaskInput) newTaskInput.addEventListener('keypress', (e) => {
 if (fab) fab.addEventListener('click', () => {
     const name = prompt("Nom de la nouvelle liste ?");
     if (name) {
+        playSound('add');
         // Construct local optimistic list
         // Note: Real ID comes from sheet, but we need one now.
         // We'll just trigger the API create and wait for refresh actually, 
@@ -2291,11 +2348,26 @@ if (searchInput) {
 
 // --- Init ---
 window.onload = function () {
+    // Check if we should play refresh sound (after a manual refreshApp call)
+    if (localStorage.getItem('play_refresh_sound') === 'true') {
+        localStorage.removeItem('play_refresh_sound');
+        // Small delay to ensure Audio context is ready
+        setTimeout(() => playSound('refresh'), 300);
+    }
+
     // Wait for Google Script to load then init
-    // Or just call renderHome to show Login button
     initTokenClient();
     renderHome();
     initColorPicker();
+
+    // Trigger page reveal animation
+    if (app) {
+        app.classList.remove('page-reveal');
+        void app.offsetWidth; // Force reflow
+        app.classList.add('page-reveal');
+        // Spawn curtain particles
+        fireCurtainParticles();
+    }
 
     // Initialize settings button as hidden
     if (settingsButton) {
