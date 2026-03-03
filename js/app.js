@@ -45,6 +45,8 @@ const userMenu = document.getElementById('user-menu');
 const btnLogoutHeader = document.getElementById('btn-logout-header');
 const refreshButton = document.getElementById('refresh-button');
 const themeCheckbox = document.getElementById('theme-checkbox');
+const soundToggle = document.getElementById('sound-toggle');
+const soundIcon = document.getElementById('sound-icon');
 
 let currentListId = null;
 let currentListName = "";
@@ -158,7 +160,8 @@ let state = {
     searchQuery: '',
     userEmail: null,
     userPicture: null,
-    completedLists: new Set() // Track which lists have triggered confetti
+    completedLists: new Set(), // Track which lists have triggered confetti
+    soundEnabled: true
 };
 
 // PWA Install Prompt
@@ -211,7 +214,7 @@ const sounds = {
 };
 
 function playSound(name) {
-    if (sounds[name]) {
+    if (state.soundEnabled && sounds[name]) {
         sounds[name].currentTime = 0;
         sounds[name].play().catch(e => console.log('Sound play blocked:', e));
     }
@@ -2355,6 +2358,26 @@ if (themeCheckbox) {
     });
 }
 
+if (soundToggle) {
+    soundToggle.addEventListener('click', () => {
+        state.soundEnabled = !state.soundEnabled;
+        localStorage.setItem('soundEnabled', state.soundEnabled);
+        updateSoundIcon();
+    });
+}
+
+function updateSoundIcon() {
+    if (!soundIcon) return;
+    if (state.soundEnabled) {
+        soundIcon.setAttribute('data-lucide', 'volume-2');
+        soundToggle.style.color = 'var(--accent-color)';
+    } else {
+        soundIcon.setAttribute('data-lucide', 'volume-x');
+        soundToggle.style.color = 'var(--text-secondary)';
+    }
+    lucide.createIcons();
+}
+
 // --- Init ---
 window.onload = function () {
     // Initialize Theme
@@ -2363,6 +2386,11 @@ window.onload = function () {
         document.body.classList.add('light-theme');
         if (themeCheckbox) themeCheckbox.checked = true;
     }
+
+    // Initialize Sound
+    const savedSound = localStorage.getItem('soundEnabled');
+    state.soundEnabled = savedSound === null ? true : savedSound === 'true';
+    updateSoundIcon();
 
     // Check if we should play refresh sound (after a manual refreshApp call)
     if (localStorage.getItem('play_refresh_sound') === 'true') {
