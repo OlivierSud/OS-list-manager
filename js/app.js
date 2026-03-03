@@ -44,6 +44,7 @@ const userAvatarFallback = document.getElementById('user-avatar-fallback');
 const userMenu = document.getElementById('user-menu');
 const btnLogoutHeader = document.getElementById('btn-logout-header');
 const refreshButton = document.getElementById('refresh-button');
+const themeCheckbox = document.getElementById('theme-checkbox');
 
 let currentListId = null;
 let currentListName = "";
@@ -2346,8 +2347,23 @@ if (searchInput) {
     });
 }
 
+if (themeCheckbox) {
+    themeCheckbox.addEventListener('change', () => {
+        const isLight = themeCheckbox.checked;
+        document.body.classList.toggle('light-theme', isLight);
+        localStorage.setItem('theme', isLight ? 'light' : 'dark');
+    });
+}
+
 // --- Init ---
 window.onload = function () {
+    // Initialize Theme
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    if (savedTheme === 'light') {
+        document.body.classList.add('light-theme');
+        if (themeCheckbox) themeCheckbox.checked = true;
+    }
+
     // Check if we should play refresh sound (after a manual refreshApp call)
     if (localStorage.getItem('play_refresh_sound') === 'true') {
         localStorage.removeItem('play_refresh_sound');
