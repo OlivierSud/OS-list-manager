@@ -24,6 +24,7 @@ const btnDelete = document.getElementById('btn-delete');
 const btnLogout = document.getElementById('btn-logout');
 const btnCancel = document.getElementById('btn-cancel');
 const btnColor = document.getElementById('btn-color');
+const btnShare = document.getElementById('btn-share');
 const colorModal = document.getElementById('color-modal');
 const colorGrid = document.getElementById('color-grid');
 const btnColorCancel = document.getElementById('btn-color-cancel');
@@ -57,6 +58,15 @@ const LONG_PRESS_MS = 280;
 let touchDragging = false;
 let touchStartX = 0, touchStartY = 0;
 let touchLastX = 0, touchLastY = 0;
+
+// Share Management Elements
+const shareManageModal = document.getElementById('share-manage-modal');
+const shareModalOwner = document.getElementById('share-modal-owner');
+const collaboratorsList = document.getElementById('collaborators-list');
+const btnShareModalClose = document.getElementById('btn-share-modal-close');
+const addCollaboratorSection = document.getElementById('add-collaborator-section');
+const shareModalInput = document.getElementById('share-modal-input');
+const btnShareModalAdd = document.getElementById('btn-share-modal-add');
 let touchGhost = null; // visual floating clone
 let touchLongPressTimer = null;
 
@@ -161,7 +171,8 @@ let state = {
     userEmail: null,
     userPicture: null,
     completedLists: new Set(), // Track which lists have triggered confetti
-    soundEnabled: true
+    soundEnabled: true,
+    shares: [] // For sharing
 };
 
 // PWA Install Prompt
@@ -201,7 +212,10 @@ let listFilters = {};
 
 // --- Utilities ---
 function generateId() {
-    return Math.random().toString(36).substring(2, 9);
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    return Math.random().toString(36).substring(2) + Date.now().toString(36);
 }
 
 // Audio Manager
@@ -220,468 +234,475 @@ function playSound(name) {
     }
 }
 
-// --- Google Sheets & Auth Integration ---
-// TODO: User must replace this with their own OAuth 2.0 Client ID from Google Cloud Console
-const CLIENT_ID = '356152485310-ofia0pr8hcig7s906tfu1c9v1us7s4gb.apps.googleusercontent.com';
-const API_KEY = 'AIzaSyBA2lV9mm9_tNIpErOd9yO5lMjlIYtlCwM';
-const SPREADSHEET_ID = '17nkELFwjGJrOjCBHTunDsAdg1GE6ylIZYc6jblAB-ps';
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid';
+// --- Supabase Auth Integration ---
+let userSession = null;
 
-let tokenClient;
-let accessToken = null;
-
-// Initialize Google Identity Services
-function initTokenClient() {
-    if (window.google) {
-        tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID,
-            scope: SCOPES,
-            callback: (tokenResponse) => {
-                if (tokenResponse.error) {
-                    console.error("Erreur d'authentification: " + tokenResponse.error);
-                    console.error("Auth Error:", tokenResponse);
-                    return;
-                }
-                accessToken = tokenResponse.access_token;
-                // Save token and expiry
-                const expiry = Date.now() + (tokenResponse.expires_in * 1000);
-                localStorage.setItem('google_access_token', accessToken);
-                localStorage.setItem('google_token_expiry', expiry);
-
-                console.log("Access Token received and saved");
-                fetchUserEmail().then(() => {
-                    renderHome();
-                    fetchSheetData();
-                });
-            },
-            error_callback: (error) => {
-                console.error("Erreur de connexion Google: " + error.message);
-                console.error("Google Auth Error:", error);
-            }
-        });
-
-        // Try to recover session
-        checkPersistentAuth();
-    }
-}
-
-function checkPersistentAuth() {
-    const savedToken = localStorage.getItem('google_access_token');
-    const expiry = localStorage.getItem('google_token_expiry');
-
-    if (savedToken && expiry && Date.now() < parseInt(expiry)) {
-        accessToken = savedToken;
-        console.log("Restored session from localStorage");
-        fetchUserEmail();
-        fetchSheetData(); // Fetch data immediately
+async function checkPersistentAuth() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) {
+        userSession = session;
+        state.userEmail = session.user.email;
+        state.userPicture = session.user.user_metadata.avatar_url;
+        console.log("Restored Supabase session:", state.userEmail);
+        fetchSupabaseData();
         renderHome();
     }
 }
 
-async function fetchUserEmail() {
-    if (!accessToken) return;
-    try {
-        const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-        const data = await response.json();
-        state.userEmail = data.email;
-        state.userPicture = data.picture;
-        console.log("Logged in as:", state.userEmail);
-    } catch (e) {
-        console.error("Failed to fetch user email", e);
-    }
-}
+async function handleLogout() {
+    const { error } = await supabaseClient.auth.signOut();
+    if (error) console.error("Error signing out:", error);
 
-function handleLogout() {
-    // Revoke token with Google if possible
-    if (window.google && accessToken) {
-        google.accounts.oauth2.revoke(accessToken, () => {
-            console.log('Token revoked');
-        });
-    }
+    userSession = null;
+    state.userEmail = null;
+    state.userPicture = null;
 
-    accessToken = null;
-    localStorage.removeItem('google_access_token');
-    localStorage.removeItem('google_token_expiry');
-
-    goHome(); // This will trigger renderHome and show login since accessToken is null
+    goHome();
     closeOptions();
 }
 
-function handleAuthClick() {
-    if (tokenClient) {
-        tokenClient.requestAccessToken();
-    } else {
-        console.error("Google API not loaded yet. Check internet connection.");
+async function handleAuthClick() {
+    const { data, error } = await supabaseClient.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+            redirectTo: window.location.origin
+        }
+    });
+
+    if (error) {
+        console.error("Supabase Auth Error:", error);
     }
 }
 
-async function fetchSheetData() {
-    if (!accessToken) return;
+async function fetchSupabaseData() {
+    if (!state.userEmail) return;
 
-    console.log("Fetching Google Sheets data...");
+    console.log("Fetching Supabase data...");
     try {
-        // 1. Get all Sheets (Tabs) to build the Lists
-        const metaResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}?fields=sheets.properties`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
+        // 1. Fetch Lists
+        // 1. Fetch My Lists
+        const { data: myLists, error: listsError } = await supabaseClient
+            .from('lists')
+            .select('*')
+            .order('created_at', { ascending: true });
 
-        if (metaResponse.status === 403) {
-            console.error("Accès refusé. Vérifiez les permissions et le partage de la feuille Google.");
-            return;
-        }
+        if (listsError) throw listsError;
 
-        const metaData = await metaResponse.json();
-
-        if (metaData.error) {
-            console.error('Google Sheets Meta Error:', metaData.error);
-            console.error("Erreur Google Sheets: " + metaData.error.message);
-            return;
-        }
-
-        // Reset state with real data
-        state.lists = [];
-        // Reset state with base list info (fast render)
-        state.lists = [];
-        state.items = {};
-
-        if (metaData.sheets && metaData.sheets.length) {
-            // Build lightweight list entries so UI can render quickly
-            metaData.sheets.forEach((sheet, index) => {
-                const title = sheet.properties.title;
-                const sheetId = sheet.properties.sheetId;
-                state.lists.push({
-                    id: sheetId,
-                    name: title,
-                    color: COLOR_PALETTE[index % COLOR_PALETTE.length],
-                    items: 0,
-                    filter: 'all'
-                });
-            });
-
-            // Render home early so user sees lists immediately
-            renderHome();
-
-            // Prepare ranges for batchGet to reduce network roundtrips
-            const ranges = metaData.sheets.map(s => `${s.properties.title}!A:D`);
-            const params = ranges.map(r => `ranges=${encodeURIComponent(r)}`).join('&');
-
-            const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:batchGet?${params}`;
-            const batchResponse = await fetch(batchUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-            const batchData = await batchResponse.json();
-
-            // Map results back to state.lists order
-            const valueRanges = (batchData && batchData.valueRanges) || [];
-            valueRanges.forEach((vr, idx) => {
-                const list = state.lists[idx];
-                const title = list.name;
-                const sheetId = list.id;
-
-                const dataValues = vr && vr.values ? vr.values : [];
-
-                // Parse filter if present in first row
-                let savedFilter = list.filter || 'all';
-                if (dataValues[0] && dataValues[0][2]) {
-                    const firstRowParts = dataValues[0][2].split('|');
-                    const filterPart = firstRowParts.find(p => p.startsWith('FILTER:'));
-                    if (filterPart) savedFilter = filterPart.replace('FILTER:', '');
+        // --- REPARATION AUTOMATIQUE ---
+        // Si je suis propriétaire d'une liste et que mon email n'est pas dedans, je le mets à jour
+        if (myLists && state.userEmail) {
+            myLists.forEach(async l => {
+                if (!l.owner_email || l.owner_email === '') {
+                    await supabaseClient.from('lists').update({ owner_email: state.userEmail }).eq('id', l.id);
                 }
-
-                const items = [];
-                let lastHeaderUid = null;
-                dataValues.forEach((row, rowIndex) => {
-                    const colC = row[2] || "";
-                    const isHeader = row[1] === "HEADER";
-
-                    const parts = colC.split('|');
-                    let uid = parts.find(p => p.startsWith('UID:'))?.replace('UID:', '');
-                    let pid = parts.find(p => p.startsWith('PID:'))?.replace('PID:', '');
-                    let color = parts.find(p => p.startsWith('COLOR:'))?.replace('COLOR:', '');
-                    let sectionName = parts.find(p => p.startsWith('SECTION:'))?.replace('SECTION:', '');
-                    let isStandalone = parts.includes('STANDALONE');
-                    let isSubHeader = parts.includes('SUBHEADER');
-
-                    if (isHeader) {
-                        if (!uid) uid = generateId();
-                        lastHeaderUid = uid;
-                        isSubHeader = false;
-                    } else {
-                        // Respect explicit metadata first: if STANDALONE flag is present, honor it.
-                        if (isStandalone) {
-                            // explicit standalone - leave pid null
-                            pid = null;
-                        } else if (pid) {
-                            // explicit PID provided in metadata - use it
-                            // keep pid as parsed
-                        } else if (lastHeaderUid) {
-                            // No explicit metadata: fall back to nearest previous header
-                            pid = lastHeaderUid;
-                        } else {
-                            // No header above and no metadata -> standalone
-                            isStandalone = true;
-                            pid = null;
-                        }
-                        // Ensure isSubHeader false for non-headers
-                        isSubHeader = false;
-                    }
-
-                    if (rowIndex === 0) {
-                        const filterPart = parts.find(p => p.startsWith('FILTER:'));
-                        if (filterPart) savedFilter = filterPart.replace('FILTER:', '');
-                    }
-
-                    items.push({
-                        id: uid || `${sheetId}-${rowIndex}-${generateId()}`,
-                        text: row[0],
-                        done: row[1] === "TRUE",
-                        isHeader: isHeader,
-                        isSubHeader: isSubHeader,
-                        isStandalone: isStandalone,
-                        parentId: isStandalone ? null : pid,
-                        color: color || null,
-                        sectionName: sectionName || null,
-                        lastModifier: row[3] || ""
-                    });
-                });
-
-                list.items = items.length;
-                list.filter = savedFilter;
-                state.items[sheetId] = items;
             });
-
-            // Update colors from metadata and re-render with full data
-            await loadListColors();
-            renderHome();
-        } else {
-            // No sheets
-            renderHome();
         }
 
-        console.log("Data sync complete:", state);
-    } catch (e) {
-        console.error("Network or API Error", e);
-    }
-}
+        // 2. Fetch Shares (both directions)
+        const currentUserEmail = (state.userEmail || "").toLowerCase();
+        const { data: incomingShares } = await supabaseClient
+            .from('shares')
+            .select('list_id')
+            .eq('shared_with_email', currentUserEmail);
 
-// Create a new sheet (list)
-async function createListInSheet(name) {
-    if (!accessToken) return;
+        // Fetch all shares for lists I own OR that are shared with me to have accurate counts/names
+        const ownedIds = (myLists || []).map(l => l.id);
+        const sharedWithMeIds = (incomingShares || []).map(s => s.list_id);
+        const allVisibleIds = [...new Set([...ownedIds, ...sharedWithMeIds])];
 
-    try {
-        const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                requests: [{
-                    addSheet: {
-                        properties: { title: name }
-                    }
-                }]
-            })
-        });
-        const data = await response.json();
-        if (!data.error) {
-            console.log("List created:", name);
-            fetchSheetData(); // Refresh all data
-        } else {
-            console.error(data.error);
-            console.error("Erreur création liste: " + data.error.message);
+        let allShares = [];
+        if (allVisibleIds.length > 0) {
+            const { data: sharesData } = await supabaseClient
+                .from('shares')
+                .select('list_id, shared_with_email')
+                .in('list_id', allVisibleIds);
+            allShares = sharesData || [];
         }
-    } catch (e) {
-        console.error(e);
-    }
-}
 
-// addItemToSheet is kept for reference but all writes now go through syncOrderToSheet
-// to guarantee metadata (UID, PID, STANDALONE, FILTER) is always saved correctly.
-async function addItemToSheet(listId, text, isHeader = false) {
-    // Delegate to full sync so all metadata is preserved
-    await syncOrderToSheet(listId);
-}
+        const sharedIdSet = new Set(allShares.map(s => s.list_id));
 
-async function toggleItemInSheet(listId, itemId, newStatus) {
-    // Update local state modifier
-    const items = state.items[listId];
-    const item = items ? items.find(i => i.id === itemId) : null;
-    if (item) item.lastModifier = state.userEmail || "";
+        // 3. Combine Lists
+        let lists = [...(myLists || [])];
+        const incomingIds = sharedWithMeIds.filter(id => !ownedIds.includes(id));
+        if (incomingIds.length > 0) {
+            const { data: sharedLists } = await supabaseClient
+                .from('lists')
+                .select('*')
+                .in('id', incomingIds);
+            if (sharedLists) lists = [...lists, ...sharedLists];
+        }
 
-    // Use full sheet sync to avoid stale row-index issues
-    await syncOrderToSheet(listId);
-}
+        state.lists = lists.map((l, index) => {
+            const currentListShares = allShares.filter(s => s.list_id === l.id);
+            const sharedEmails = [];
+            const isOwner = l.owner_email && l.owner_email.toLowerCase() === currentUserEmail;
 
-async function renameSheet(sheetId, newName) {
-    if (!accessToken) return;
-    try {
-        const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                requests: [{
-                    updateSheetProperties: {
-                        properties: { sheetId: sheetId, title: newName },
-                        fields: "title"
-                    }
-                }]
-            })
-        });
-        const data = await response.json();
-        if (!data.error) {
-            // Update local state
-            const list = state.lists.find(l => l.id === sheetId);
-            if (list) list.name = newName;
-
-            // If we're currently viewing this list, stay in it
-            if (state.view === 'list' && state.activeListId === sheetId) {
-                renderList(sheetId);
-            } else {
-                fetchSheetData();
+            // 1. Gather display emails for the modal (excluding current user)
+            if (isOwner) {
+                currentListShares
+                    .filter(s => s.shared_with_email.toLowerCase() !== currentUserEmail)
+                    .forEach(s => sharedEmails.push(s.shared_with_email));
+            } else if (l.owner_email) {
+                sharedEmails.push(`Propriétaire : ${l.owner_email}`);
             }
-            return true;
+
+            // 2. Calculate TOTAL users (Owner + all unique guests)
+            // The shares table has guests. Owner is in the lists table.
+            const uniqueGuests = new Set(currentListShares.map(s => s.shared_with_email.toLowerCase()));
+            const userCount = 1 + uniqueGuests.size;
+
+            return {
+                id: l.id,
+                name: l.name,
+                color: l.color || COLOR_PALETTE[index % COLOR_PALETTE.length],
+                isShared: sharedIdSet.has(l.id),
+                sharedEmails: sharedEmails,
+                userCount: userCount,
+                ownerId: l.owner_id,
+                ownerEmail: l.owner_email,
+                items: 0,
+                filter: 'all'
+            };
+        });
+
+        // 2. Fetch Tasks for all lists
+        const { data: tasks, error: tasksError } = await supabaseClient
+            .from('tasks')
+            .select('*')
+            .order('position', { ascending: true });
+
+        if (tasksError) throw tasksError;
+
+        state.items = {};
+        tasks.forEach(task => {
+            if (!state.items[task.list_id]) state.items[task.list_id] = [];
+            state.items[task.list_id].push({
+                id: task.id,
+                text: task.text,
+                done: task.done,
+                isHeader: task.is_header,
+                isSubHeader: task.is_sub_header,
+                parentId: task.parent_id,
+                color: task.color,
+                lastModifier: task.last_modifier
+            });
+        });
+
+        // Update item count for lists (exclude headers)
+        state.lists.forEach(list => {
+            const listItems = state.items[list.id] || [];
+            list.items = listItems.filter(i => !i.isHeader).length;
+        });
+
+        renderHome();
+        console.log("Supabase sync complete:", state);
+    } catch (e) {
+        console.error("Supabase Data Error:", e);
+    }
+}
+
+// Create a new list
+async function createListInSupabase(name) {
+    if (!state.userEmail) return;
+
+    try {
+        const user = (await supabaseClient.auth.getUser()).data.user;
+        const { data, error } = await supabaseClient
+            .from('lists')
+            .insert([{
+                name: name,
+                owner_id: user.id,
+                owner_email: user.email,
+                color: COLOR_PALETTE[state.lists.length % COLOR_PALETTE.length]
+            }])
+            .select();
+
+        if (error) throw error;
+        console.log("List created in Supabase:", data[0]);
+        fetchSupabaseData();
+    } catch (e) {
+        console.error("Error creating list:", e);
+    }
+}
+
+async function shareListWithUser(listId, email) {
+    if (!state.userEmail) return;
+    const targetEmail = email.trim().toLowerCase();
+
+    if (!targetEmail || !targetEmail.includes('@')) {
+        alert("Veuillez entrer une adresse email valide.");
+        return;
+    }
+
+    try {
+        const user = (await supabaseClient.auth.getUser()).data.user;
+        const { error } = await supabaseClient
+            .from('shares')
+            .insert([{
+                list_id: listId,
+                shared_with_email: targetEmail,
+                owner_id: user.id
+            }]);
+
+        if (error) throw error;
+        alert(`Liste partagée avec ${targetEmail} !`);
+        fetchSupabaseData(); // Refresh to update share icons/details
+        closeOptions();
+        closeShareModal();
+    } catch (e) {
+        console.error("Share error:", e);
+        alert("Impossible de partager cette liste. Vérifiez que l'email est correct.");
+    }
+}
+
+async function removeCollaborator(listId, email) {
+    if (!confirm(`Retirer ${email} de cette liste ?`)) return;
+
+    try {
+        const { error } = await supabaseClient
+            .from('shares')
+            .delete()
+            .eq('list_id', listId)
+            .eq('shared_with_email', email.toLowerCase());
+
+        if (error) throw error;
+        alert("Collaborateur retiré.");
+        fetchSupabaseData();
+        closeShareModal();
+    } catch (e) {
+        console.error("Remove share error:", e);
+        alert("Erreur lors de la suppression.");
+    }
+}
+
+async function leaveList(listId) {
+    if (!confirm("Voulez-vous vraiment quitter cette liste ? Vous ne pourrez plus y accéder.")) return;
+
+    try {
+        const currentUserEmail = (state.userEmail || "").toLowerCase();
+        const { error } = await supabaseClient
+            .from('shares')
+            .delete()
+            .eq('list_id', listId)
+            .eq('shared_with_email', currentUserEmail);
+
+        if (error) throw error;
+        alert("Vous avez quitté la liste.");
+        fetchSupabaseData();
+        closeShareModal();
+        renderHome();
+    } catch (e) {
+        console.error("Leave list error:", e);
+        alert("Erreur lors de la sortie de la liste.");
+    }
+}
+
+function showShareDetails(e, listId) {
+    if (e) e.stopPropagation();
+    const list = state.lists.find(l => l.id === listId);
+    if (!list || !list.isShared) return;
+
+    const currentUserEmail = (state.userEmail || "").toLowerCase();
+    const isOwner = list.ownerEmail && list.ownerEmail.toLowerCase() === currentUserEmail;
+
+    if (shareModalOwner) {
+        shareModalOwner.innerText = list.ownerEmail ? `Propriétaire : ${list.ownerEmail}` : "Propriétaire inconnu";
+    }
+
+    if (addCollaboratorSection) {
+        if (isOwner) {
+            addCollaboratorSection.classList.remove('hidden');
+            if (btnShareModalAdd) {
+                btnShareModalAdd.onclick = () => {
+                    const email = shareModalInput.value;
+                    if (email) {
+                        shareListWithUser(listId, email);
+                        shareModalInput.value = '';
+                    } else {
+                        alert("Veuillez entrer un email.");
+                    }
+                };
+            }
         } else {
-            console.error("Erreur: " + data.error.message);
-            return false;
+            addCollaboratorSection.classList.add('hidden');
         }
+    }
+
+    if (collaboratorsList) {
+        collaboratorsList.innerHTML = '';
+
+        const emails = list.sharedEmails || [];
+
+        if (isOwner) {
+            if (emails.length === 0) {
+                collaboratorsList.innerHTML = '<p style="text-align:center; color:var(--text-secondary); font-size:0.9rem;">Aucun collaborateur pour le moment.</p>';
+            } else {
+                emails.forEach(email => {
+                    const div = document.createElement('div');
+                    div.style = "display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--border-color);";
+                    div.innerHTML = `
+                        <span style="font-size: 0.9rem; word-break: break-all; flex: 1; margin-right: 0.5rem;">${email}</span>
+                        <button class="btn-icon-small" style="color: var(--danger-color); background: rgba(239, 68, 68, 0.1); padding: 4px; border-radius: 4px;" onclick="removeCollaborator('${listId}', '${email}')">
+                            <i data-lucide="user-minus" style="width: 18px; height: 18px;"></i>
+                        </button>
+                    `;
+                    collaboratorsList.appendChild(div);
+                });
+            }
+        } else {
+            const div = document.createElement('div');
+            div.style = "display: flex; flex-direction: column; gap: 1rem; align-items: center; padding: 1rem; background: rgba(255,255,255,0.03); border-radius: 0.5rem;";
+            div.innerHTML = `
+                <p style="font-size: 0.9rem; color: var(--text-secondary); text-align: center;">Vous avez accès à cette liste en tant qu'invité.</p>
+                <button class="btn-icon" style="width: 100%; justify-content: center; background: rgba(239, 68, 68, 0.1); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.2); padding: 0.75rem;" onclick="leaveList('${listId}')">
+                    <i data-lucide="log-out" style="width: 18px; height: 18px; margin-right: 8px;"></i> Quitter la liste
+                </button>
+            `;
+            collaboratorsList.appendChild(div);
+        }
+    }
+
+    if (shareManageModal) shareManageModal.classList.remove('hidden');
+    lucide.createIcons({ scope: shareManageModal });
+}
+
+function closeShareModal() {
+    if (shareManageModal) shareManageModal.classList.add('hidden');
+}
+
+if (btnShareModalClose) btnShareModalClose.onclick = closeShareModal;
+
+window.showShareDetails = showShareDetails;
+window.removeCollaborator = removeCollaborator;
+window.leaveList = leaveList;
+
+async function syncOrderToSheet(listId) {
+    if (!state.userEmail) return;
+    const items = state.items[listId] || [];
+
+    const tasksToUpsert = items.map((item, index) => ({
+        id: (item.id && item.id.toString().length > 10) ? item.id : undefined,
+        list_id: listId,
+        text: item.text,
+        done: !!item.done,
+        is_header: !!item.isHeader,
+        is_sub_header: !!item.isSubHeader,
+        parent_id: item.parentId,
+        position: index,
+        color: item.color,
+        last_modifier: item.lastModifier || state.userEmail
+    }));
+
+    try {
+        const { error } = await supabaseClient
+            .from('tasks')
+            .upsert(tasksToUpsert, { onConflict: 'id' });
+
+        if (error) throw error;
+    } catch (e) {
+        console.error("Sync error:", e);
+    }
+}
+
+async function deleteListItemInSupabase(listId, itemId) {
+    try {
+        const { error } = await supabaseClient
+            .from('tasks')
+            .delete()
+            .eq('id', itemId);
+        if (error) throw error;
+    } catch (e) {
+        console.error("Delete error:", e);
+    }
+}
+
+async function deleteListInSupabase(listId) {
+    if (!state.userEmail) return;
+    try {
+        const { error } = await supabaseClient
+            .from('lists')
+            .delete()
+            .eq('id', listId);
+        if (error) throw error;
+        fetchSupabaseData();
+    } catch (e) { console.error(e); }
+}
+
+async function renameListInSupabase(listId, newName) {
+    if (!state.userEmail) return;
+    try {
+        const { error } = await supabaseClient
+            .from('lists')
+            .update({ name: newName })
+            .eq('id', listId);
+        if (error) throw error;
+        fetchSupabaseData();
+        return true;
     } catch (e) { console.error(e); return false; }
 }
 
-async function duplicateSheet(sheetId) {
-    if (!accessToken) return;
+async function updateListColorInSupabase(listId, hexColor) {
+    if (!state.userEmail) return;
     try {
-        const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                requests: [{
-                    duplicateSheet: {
-                        sourceSheetId: sheetId,
-                        newSheetName: currentListName + " (Copie)"
-                    }
-                }]
-            })
-        });
-        const data = await response.json();
-        if (!data.error) fetchSheetData();
-        else console.error("Erreur: " + data.error.message);
+        const { error } = await supabaseClient
+            .from('lists')
+            .update({ color: hexColor })
+            .eq('id', listId);
+        if (error) throw error;
+        fetchSupabaseData();
     } catch (e) { console.error(e); }
 }
 
-async function deleteSheet(sheetId) {
-    if (!accessToken) return;
+
+async function duplicateListInSupabase(listId) {
+    if (!state.userEmail) return;
     try {
-        const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                requests: [{
-                    deleteSheet: {
-                        sheetId: sheetId
-                    }
-                }]
-            })
-        });
-        const data = await response.json();
-        if (!data.error) fetchSheetData();
-        else console.error("Erreur: " + data.error.message);
+        const list = state.lists.find(l => l.id === listId);
+        if (!list) return;
+
+        // 1. Create new list
+        const { data: newList, error: listError } = await supabaseClient
+            .from('lists')
+            .insert([{
+                name: list.name + " (Copie)",
+                owner_id: (await supabaseClient.auth.getUser()).data.user.id,
+                color: list.color
+            }])
+            .select();
+
+        if (listError) throw listError;
+
+        // 2. Clone tasks
+        const tasks = state.items[listId] || [];
+        const tasksToInsert = tasks.map((t, idx) => ({
+            list_id: newList[0].id,
+            text: t.text,
+            done: t.done,
+            is_header: t.isHeader,
+            is_sub_header: t.isSubHeader,
+            position: idx,
+            color: t.color
+        }));
+
+        if (tasksToInsert.length > 0) {
+            const { error: tasksError } = await supabaseClient
+                .from('tasks')
+                .insert(tasksToInsert);
+            if (tasksError) throw tasksError;
+        }
+
+        fetchSupabaseData();
     } catch (e) { console.error(e); }
 }
 
-async function loadListColors() {
-    if (!accessToken) return;
-
+async function shareListInSupabase(listId, email) {
+    if (!state.userEmail) return;
     try {
-        const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}?fields=sheets.properties`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-        const data = await response.json();
-
-        if (data.sheets) {
-            data.sheets.forEach(sheet => {
-                const sheetId = sheet.properties.sheetId;
-                const tabColor = sheet.properties.tabColor;
-
-                if (tabColor) {
-                    const list = state.lists.find(l => l.id === sheetId);
-                    if (list) {
-                        // Convert RGB to hex
-                        const r = Math.round((tabColor.red || 0) * 255);
-                        const g = Math.round((tabColor.green || 0) * 255);
-                        const b = Math.round((tabColor.blue || 0) * 255);
-                        list.color = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-                    }
-                }
-            });
-        }
-    } catch (e) {
-        console.error('Failed to load colors:', e);
-    }
-}
-
-async function updateSheetColor(sheetId, hexColor) {
-    if (!accessToken) return;
-
-    // Convert hex to RGB (0-1 range)
-    const r = parseInt(hexColor.slice(1, 3), 16) / 255;
-    const g = parseInt(hexColor.slice(3, 5), 16) / 255;
-    const b = parseInt(hexColor.slice(5, 7), 16) / 255;
-
-    try {
-        const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                requests: [{
-                    updateSheetProperties: {
-                        properties: {
-                            sheetId: sheetId,
-                            tabColor: { red: r, green: g, blue: b }
-                        },
-                        fields: "tabColor"
-                    }
-                }]
-            })
-        });
-
-        const data = await response.json();
-        if (!data.error) {
-            // Update local state
-            const list = state.lists.find(l => l.id === sheetId);
-            if (list) list.color = hexColor;
-
-            // If we're currently viewing this list, stay in it
-            if (state.view === 'list' && state.activeListId === sheetId) {
-                renderList(sheetId);
-            } else {
-                renderHome();
-            }
-        } else {
-            console.error("Erreur: " + data.error.message);
-        }
-    } catch (e) {
-        console.error(e);
-    }
-}
-
-async function deleteSheet(sheetId) {
-    if (!accessToken) return;
-    try {
-        const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                requests: [{
-                    deleteSheet: {
-                        sheetId: sheetId
-                    }
-                }]
-            })
-        });
-        const data = await response.json();
-        if (!data.error) fetchSheetData();
-        else console.error("Erreur: " + data.error.message);
+        const { error } = await supabaseClient
+            .from('list_shares')
+            .insert([{ list_id: listId, invited_email: email, permission: 'write' }]);
+        if (error) throw error;
+        alert(`Liste partagée avec ${email}`);
     } catch (e) { console.error(e); }
 }
 
@@ -715,7 +736,7 @@ function initColorPicker() {
         colorBtn.onmouseout = () => colorBtn.style.transform = 'scale(1)';
         colorBtn.onclick = () => {
             if (colorTarget.type === 'list') {
-                updateSheetColor(colorTarget.id, color);
+                updateListColorInSupabase(colorTarget.id, color);
             } else {
                 updateSectionColor(colorTarget.index, color);
             }
@@ -761,21 +782,7 @@ function updateFilterButtonUI() {
     lucide.createIcons();
 }
 
-async function saveListFilter(sheetTitle, filterValue) {
-    if (!accessToken) return;
-    try {
-        // Write filter state to cell C1
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(sheetTitle)}!C1?valueInputOption=RAW`, {
-            method: 'PUT',
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                values: [[`FILTER:${filterValue}`]]
-            })
-        });
-    } catch (e) {
-        console.error('Failed to save filter:', e);
-    }
-}
+// function saveListFilter(...) { /* Removed - Sheets only */ }
 
 // --- Render Functions ---
 
@@ -898,7 +905,7 @@ function fireConfetti(durationMs) {
 
 function renderHome() {
     /* Login State Helper */
-    if (!accessToken) {
+    if (!state.userEmail) {
         // Show Login Screen
         app.classList.add('hidden');
         loginContainer.classList.remove('hidden');
@@ -971,23 +978,27 @@ function renderHome() {
     }
 
     state.lists.forEach(list => {
-        const itemCount = state.items[list.id] ? state.items[list.id].length : 0;
+        const listItems = state.items[list.id] || [];
+        const itemCount = listItems.filter(i => !i.isHeader).length;
 
         const el = document.createElement('div');
         el.className = 'glass-panel list-item';
         // Remove global onclick, move to inner div
 
         el.innerHTML = `
-            <div onclick="openList(${list.id})" style="display: flex; align-items: center; flex: 1;">
+            <div onclick="openList('${list.id}')" style="display: flex; align-items: center; flex: 1;">
                 <div class="list-icon" style="background-color: ${list.color}">
                     <i data-lucide="list"></i>
                 </div>
                 <div>
                     <h3>${list.name}</h3>
-                    <div class="list-meta">${itemCount} éléments</div>
+                    <div class="list-meta">
+                        ${itemCount} éléments 
+                        ${list.isShared ? `<span onclick="showShareDetails(event, '${list.id}')" style="color: var(--accent-color); font-weight: bold; margin-left: 0.5rem; cursor: pointer; text-decoration: underline dotted;">• <i data-lucide="users" style="width: 12px; height: 12px; margin-right: 2px;"></i> ${list.userCount} ${list.userCount > 1 ? 'utilisateurs' : 'utilisateur'}</span>` : ''}
+                    </div>
                 </div>
             </div>
-            <button class="btn-icon" onclick="openOptions(event, ${list.id}, '${list.name.replace(/'/g, "\\'")}')" style="margin-left: 0.5rem; color: var(--text-secondary);">
+            <button class="btn-icon" onclick="openOptions(event, '${list.id}', '${list.name.replace(/'/g, "\\'")}')" style="margin-left: 0.5rem; color: var(--text-secondary);">
                 <i data-lucide="more-vertical"></i>
             </button>
         `;
@@ -1423,14 +1434,18 @@ function deleteListItem(index, e) {
             // Recheck items in case state changed
             const freshItems = state.items[listId];
             if (freshItems && freshItems[index]) {
+                const itemIdToDelete = freshItems[index].id;
                 freshItems.splice(index, 1);
                 renderList(listId);
-                syncOrderToSheet(listId);
+                deleteListItemInSupabase(listId, itemIdToDelete);
+                syncOrderToSheet(listId); // Still sync for position updates
             }
         }, 360);
     } else {
+        const itemIdToDelete = items[index].id;
         items.splice(index, 1);
         renderList(listId);
+        deleteListItemInSupabase(listId, itemIdToDelete);
         syncOrderToSheet(listId);
     }
 }
@@ -1562,7 +1577,7 @@ function toggleItem(itemId) {
         renderList(listId); // Re-render to update UI
 
         // Sync with Cloud
-        toggleItemInSheet(listId, itemId, item.done);
+        syncOrderToSheet(listId);
     }
 }
 
@@ -1594,8 +1609,10 @@ function addItem() {
         text: text,
         done: false,
         isHeader: isHeader,
+        isSubHeader: false,
         isStandalone: isStandalone,
-        parentId: parentId
+        parentId: parentId,
+        lastModifier: state.userEmail
     };
 
     if (!state.items[listId]) state.items[listId] = [];
@@ -1682,6 +1699,14 @@ function openOptions(e, id, name) {
         if (btnDuplicate) btnDuplicate.classList.remove('hidden');
         if (btnColor) btnColor.classList.remove('hidden');
         if (btnDelete) btnDelete.classList.remove('hidden');
+    }
+
+    if (btnShare) {
+        btnShare.classList.remove('hidden');
+        btnShare.onclick = () => {
+            const email = prompt("Email de la personne avec qui partager cette liste :");
+            if (email) shareListWithUser(id, email);
+        };
     }
 
     // Always reset logout for regular options (only shown in Logout button click)
@@ -2131,84 +2156,7 @@ function setupBoundaryDragHandlers(element, position) {
     });
 }
 
-async function syncOrderToSheet(listId) {
-    if (!accessToken) return;
-
-    const list = state.lists.find(l => l.id === listId);
-    if (!list) return;
-
-    const items = state.items[listId];
-    const values = items.map((item, idx) => {
-        let meta = [];
-
-        // Always save UID for every item (header or not) so IDs are stable across reloads
-        if (item.id) meta.push(`UID:${item.id}`);
-
-        if (item.isStandalone) meta.push("STANDALONE");
-
-        // Recalculate closest preceding header for PID/SECTION
-        let currentHeaderId = null;
-        for (let i = idx - 1; i >= 0; i--) {
-            if (items[i].isHeader) {
-                currentHeaderId = items[i].id;
-                break;
-            }
-        }
-
-        if (!item.isHeader) {
-            if (!item.isStandalone) {
-                item.parentId = currentHeaderId;
-            } else {
-                item.parentId = null;
-            }
-            if (item.parentId) meta.push(`PID:${item.parentId}`);
-
-            // Add explicit SECTION name metadata to make ownership clear in Sheets
-            const parentHeader = items.find(h => h.isHeader && h.id === item.parentId);
-            if (parentHeader && parentHeader.text) {
-                // Replace any pipe chars to avoid breaking our meta format
-                const safeName = parentHeader.text.replace(/\|/g, ' ');
-                meta.push(`SECTION:${safeName}`);
-            }
-        } else {
-            item.parentId = null;
-        }
-
-        if (item.color) meta.push(`COLOR:${item.color}`);
-
-        let colC = meta.join("|");
-        if (idx === 0) {
-            colC = `FILTER:${list.filter}${colC ? "|" + colC : ""}`;
-        }
-        return [
-            item.text,
-            item.isHeader ? 'HEADER' : (item.done ? 'TRUE' : 'FALSE'),
-            colC,
-            item.lastModifier || ""
-        ];
-    });
-
-    try {
-        // Clear and rewrite the entire sheet A:D
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(list.name)}!A:D:clear`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(list.name)}!A:D?valueInputOption=USER_ENTERED`, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ values })
-        });
-
-        console.log('Order synced to sheet');
-    } catch (e) {
-        console.error('Failed to sync order:', e);
-    }
-}
+// function syncOrderToSheet(listId) { /* Removed logic handled by Supabase syncOrderToSheet above */ }
 
 // --- Event Listeners ---
 
@@ -2231,11 +2179,7 @@ if (fab) fab.addEventListener('click', () => {
     const name = prompt("Nom de la nouvelle liste ?");
     if (name) {
         playSound('add');
-        // Construct local optimistic list
-        // Note: Real ID comes from sheet, but we need one now.
-        // We'll just trigger the API create and wait for refresh actually, 
-        // because we need the SheetID for everything else.
-        createListInSheet(name);
+        createListInSupabase(name);
     }
 });
 
@@ -2250,21 +2194,21 @@ if (modal) modal.onclick = (e) => {
 if (btnRename) btnRename.onclick = () => {
     const newName = prompt("Nouveau nom :", currentListName);
     if (newName && newName !== currentListName) {
-        renameSheet(currentListId, newName);
+        renameListInSupabase(currentListId, newName);
         closeOptions();
     }
 };
 
 if (btnDuplicate) btnDuplicate.onclick = () => {
     if (confirm("Dupliquer cette liste ?")) {
-        duplicateSheet(currentListId);
+        duplicateListInSupabase(currentListId);
         closeOptions();
     }
 };
 
 if (btnDelete) btnDelete.onclick = () => {
     if (confirm("Voulez-vous vraiment supprimer cette liste ? Cette action est irréversible.")) {
-        deleteSheet(currentListId);
+        deleteListInSupabase(currentListId);
         closeOptions();
     }
 };
@@ -2308,11 +2252,10 @@ if (filterButton) filterButton.addEventListener('click', () => {
     else if (state.filter === 'active') state.filter = 'completed';
     else state.filter = 'all';
 
-    // Save to local logic
+    // Local memory only for list filters
     const list = state.lists.find(l => l.id === state.activeListId);
     if (list) {
         list.filter = state.filter;
-        saveListFilter(list.name, state.filter);
     }
 
     renderList(state.activeListId);
@@ -2399,8 +2342,8 @@ window.onload = function () {
         setTimeout(() => playSound('refresh'), 300);
     }
 
-    // Wait for Google Script to load then init
-    initTokenClient();
+    // Supabase Auth Init
+    checkPersistentAuth();
     renderHome();
     initColorPicker();
 

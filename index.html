@@ -10,7 +10,7 @@
 
   <!-- PWA Settings -->
   <meta name="description"
-    content="Une application simple et puissante pour gérer vos listes de tâches et courses. Synchronisation Google Sheets." />
+    content="Une application simple et puissante pour gérer vos listes de tâches et courses. Synchronisation Supabase." />
 
   <!-- Fonts & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,8 +20,8 @@
   <!-- Lucide Icons (Small, Modern) -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
-  <!-- Google Identity Services -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- Supabase Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- Styles -->
   <link rel="stylesheet" href="css/style.css?v=4">
@@ -29,17 +29,17 @@
 
 <body>
 
-  <div id="login-container" class="hidden"
+  <div id="login-container"
     style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; padding: 2rem; text-align: center;">
     <h1 style="color: var(--accent-color); margin-bottom: 2rem;">OS List Manager</h1>
     <p style="margin-bottom: 2rem; color: var(--text-secondary);">Connectez-vous pour gérer vos listes.</p>
-    <button id="login-button" class="btn-send"
+    <button id="login-button" class="btn-send" onclick="handleAuthClick()"
       style="width: auto; padding: 1rem 2rem; border-radius: 2rem; gap: 0.5rem;">
       <i data-lucide="log-in"></i> Se connecter avec Google
     </button>
   </div>
 
-  <div id="app">
+  <div id="app" class="hidden">
 
     <!-- PWA Install Banner (Mobile Only) -->
     <div id="pwa-install-banner" class="hidden glass-panel"
@@ -80,8 +80,7 @@
               style="position: absolute; top: 120%; right: 0; min-width: max-content; padding: 0.5rem; z-index: 1000; animation: fadeIn 0.1s ease-out;">
               <button id="btn-logout-header" class="btn-icon"
                 style="width: 100%; justify-content: flex-start; color: var(--danger-color); font-size: 0.9rem; white-space: nowrap;">
-                <i data-lucide="log-out" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Déconnexion /
-                Changer
+                <i data-lucide="log-out" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Déconnexion
               </button>
             </div>
           </div>
@@ -193,6 +192,11 @@
             <i data-lucide="copy"></i> Dupliquer
           </button>
 
+          <button id="btn-share" class="btn-icon"
+            style="width: 100%; border-radius: 0.5rem; justify-content: flex-start; gap: 0.75rem; font-size: 1rem; padding: 0.75rem; background: rgba(255,255,255,0.1); color: var(--accent-color); border: 0.6px solid rgba(59, 130, 246, 0.2);">
+            <i data-lucide="share-2"></i> Partager
+          </button>
+
           <button id="btn-color" class="btn-icon"
             style="width: 100%; border-radius: 0.5rem; justify-content: flex-start; gap: 0.75rem; font-size: 1rem; padding: 0.75rem; background: rgba(255,255,255,0.05);">
             <i data-lucide="palette"></i> Couleur
@@ -244,9 +248,45 @@
       </div>
     </div>
 
+    <!-- Share Management Modal -->
+    <div id="share-manage-modal" class="hidden"
+      style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1002; backdrop-filter: blur(10px);">
+      <div class="glass-panel"
+        style="width: 93%; max-width: 380px; padding: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border-color); box-shadow: 0 10px 40px rgba(0,0,0,0.8); border-radius: var(--radius-lg);">
+        <h2 style="margin-top: 0; font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem;">Collaboration</h2>
+        <p id="share-modal-owner"
+          style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; word-break: break-all;"></p>
+
+        <div id="add-collaborator-section" class="hidden" style="margin-bottom: 1.5rem;">
+          <label
+            style="display: block; font-size: 0.8rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 0.5rem;">Ajouter
+            un collaborateur</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="email" id="share-modal-input" placeholder="email@exemple.com"
+              style="flex: 1; min-width: 0; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 0.6rem 0.8rem; color: var(--text-primary); font-size: 0.9rem; outline: none;">
+            <button id="btn-share-modal-add" class="btn-icon"
+              style="flex-shrink: 0; width: 42px; height: 42px; justify-content: center; background: var(--accent-color); color: white;">
+              <i data-lucide="plus"></i>
+            </button>
+          </div>
+        </div>
+
+        <div id="collaborators-list"
+          style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 200px; overflow-y: auto; margin-bottom: 1.5rem; padding-right: 0.5rem;">
+          <!-- Items injected by JS -->
+        </div>
+
+        <button id="btn-share-modal-close" class="btn-icon"
+          style="width: 100%; border-radius: 0.5rem; justify-content: center; font-size: 1rem; padding: 0.75rem; background: var(--border-color); color: var(--text-primary);">
+          Fermer
+        </button>
+      </div>
+    </div>
+
   </div>
 
-  <script src="js/app.js?v=4"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/app.js?v=13"></script>
   <script>
     // Initialize Lucide Icons after load
     document.addEventListener("DOMContentLoaded", function () {
