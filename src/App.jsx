@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, List, CheckSquare, Settings, ArrowLeft, RefreshCw } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { fetchSheetData } from './utils/googleSheets'
+import InstallPWA from './components/InstallPWA'
 import './index.css'
 
 // Mock Data for initial dev (Fallback)
@@ -253,6 +254,9 @@ function App() {
                     <Plus size={32} />
                 </button>
             )}
+
+            {/* Bannière d'installation PWA */}
+            <InstallPWA />
         </div>
     )
 }
