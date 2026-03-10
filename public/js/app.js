@@ -2803,8 +2803,8 @@ window.onload = function () {
 // --- Service Worker Registration with Force Update Detection ---
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js?v=4').then(registration => {
-            console.log('SW Registered (v4)');
+        navigator.serviceWorker.register('sw.js?v=5').then(registration => {
+            console.log('SW Registered (v5)');
 
             // Check for updates
             registration.addEventListener('updatefound', () => {
