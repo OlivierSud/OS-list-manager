@@ -260,12 +260,13 @@ async function handleLogout() {
     goHome();
     closeOptions();
 }
+window.handleLogout = handleLogout;
 
 async function handleAuthClick() {
     const { data, error } = await supabaseClient.auth.signInWithOAuth({
         provider: 'google',
         options: {
-            redirectTo: window.location.origin
+            redirectTo: window.location.origin + window.location.pathname
         }
     });
 
@@ -273,6 +274,7 @@ async function handleAuthClick() {
         console.error("Supabase Auth Error:", error);
     }
 }
+window.handleAuthClick = handleAuthClick;
 
 async function fetchSupabaseData() {
     if (!state.userEmail) return;
