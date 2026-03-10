@@ -1,0 +1,147 @@
+name: 📱 Build APK Android (TWA)
+
+on:
+  # Déclenchement manuel depuis l'onglet "Actions" de GitHub
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version de l APK (ex: 1.0.0)'
+        required: false
+        default: '1.0.0'
+
+jobs:
+  build-apk:
+    name: Build TWA APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # ─── 1. Récupération du code ──────────────────────────────────────────────
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      # ─── 2. Configuration Java ────────────────────────────────────────────────
+      - name: ☕ Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # ─── 3. Configuration Node.js ─────────────────────────────────────────────
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # ─── 4. Configuration SDK Android (Command-line tools seulement) ──────────
+      - name: 🤖 Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 📦 Install Android Build Tools
+        run: |
+          sdkmanager --install "build-tools;34.0.0" "platforms;android-34" "platform-tools"
+
+      # ─── 5. Installation de Bubblewrap CLI ────────────────────────────────────
+      - name: 🫧 Install Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli
+
+      # ─── 6. Initialisation du projet TWA ─────────────────────────────────────
+      - name: 🔧 Initialize TWA project
+        working-directory: APK-android
+        run: |
+          bubblewrap init \
+            --manifest "https://oliviersud.github.io/OS-list-manager/manifest.json" \
+            --directory . \
+            --skipPwaValidation
+
+      # ─── 7. Génération d'une clé de signature (pour side-loading) ─────────────
+      - name: 🔑 Generate signing keystore
+        working-directory: APK-android
+        run: |
+          mkdir -p keystore
+          keytool -genkeypair \
+            -v \
+            -keystore keystore/os-list-manager.keystore \
+            -alias oslistmanager \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass "oslistmanager2024" \
+            -keypass "oslistmanager2024" \
+            -dname "CN=OS List Manager, OU=Personal, O=OlivierSud, L=France, ST=France, C=FR"
+
+      # ─── 8. Mise à jour de la config Bubblewrap avec la clé ───────────────────
+      - name: ⚙️ Configure signing in twa-manifest.json
+        working-directory: APK-android
+        run: |
+          # Mettre à jour le chemin du keystore dans le manifest généré par bubblewrap
+          if [ -f "twa-manifest.json" ]; then
+            node -e "
+              const fs = require('fs');
+              const cfg = JSON.parse(fs.readFileSync('twa-manifest.json', 'utf8'));
+              cfg.signingKey = {
+                path: './keystore/os-list-manager.keystore',
+                alias: 'oslistmanager'
+              };
+              cfg.appVersionName = '${{ github.event.inputs.version || '1.0.0' }}';
+              fs.writeFileSync('twa-manifest.json', JSON.stringify(cfg, null, 2));
+              console.log('✅ Config mise à jour');
+            "
+          fi
+
+      # ─── 9. Build de l'APK ────────────────────────────────────────────────────
+      - name: 🔨 Build APK
+        working-directory: APK-android
+        env:
+          BUBBLEWRAP_KEYSTORE_PASSWORD: "oslistmanager2024"
+          BUBBLEWRAP_KEY_PASSWORD: "oslistmanager2024"
+        run: |
+          bubblewrap build --skipPwaValidation
+
+      # ─── 10. Renommer et déplacer l'APK ──────────────────────────────────────
+      - name: 📋 Locate and rename APK
+        working-directory: APK-android
+        run: |
+          mkdir -p output
+          VERSION="${{ github.event.inputs.version || '1.0.0' }}"
+          
+          # Chercher l'APK généré
+          APK_FILE=$(find . -name "*.apk" -not -path "./output/*" | head -1)
+          
+          if [ -n "$APK_FILE" ]; then
+            cp "$APK_FILE" "output/OS-List-Manager-v${VERSION}.apk"
+            echo "✅ APK trouvé : $APK_FILE"
+            echo "✅ Copié vers : output/OS-List-Manager-v${VERSION}.apk"
+            ls -lh "output/"
+          else
+            echo "❌ Aucun APK trouvé !"
+            find . -name "*.apk" 2>/dev/null || echo "Aucun fichier .apk dans le projet"
+            exit 1
+          fi
+
+      # ─── 11. Upload de l'APK comme artifact téléchargeable ───────────────────
+      - name: 📤 Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OS-List-Manager-APK-v${{ github.event.inputs.version || '1.0.0' }}
+          path: APK-android/output/*.apk
+          retention-days: 30
+
+      # ─── 12. Résumé du build ──────────────────────────────────────────────────
+      - name: 📊 Build Summary
+        run: |
+          echo "## 📱 APK Android généré avec succès !" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Paramètre | Valeur |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Version** | ${{ github.event.inputs.version || '1.0.0' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Package** | com.oliviersud.oslistmanager |" >> $GITHUB_STEP_SUMMARY
+          echo "| **URL cible** | https://oliviersud.github.io/OS-list-manager |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Méthode** | TWA (Trusted Web Activity) |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⬇️ **Téléchargez l'APK dans l'onglet Artifacts ci-dessous**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Installation sur Android" >> $GITHUB_STEP_SUMMARY
+          echo "1. Téléchargez le fichier ZIP de l'artifact" >> $GITHUB_STEP_SUMMARY
+          echo "2. Extrayez l'APK" >> $GITHUB_STEP_SUMMARY
+          echo "3. Activez **Sources inconnues** dans les paramètres Android" >> $GITHUB_STEP_SUMMARY
+          echo "4. Ouvrez le fichier APK pour installer" >> $GITHUB_STEP_SUMMARY

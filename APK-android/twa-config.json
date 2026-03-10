@@ -1,0 +1,39 @@
+{
+  "packageId": "com.oliviersud.oslistmanager",
+  "host": "oliviersud.github.io",
+  "name": "OS List Manager",
+  "launcherName": "Mes Listes",
+  "display": "standalone",
+  "themeColor": "#3b82f6",
+  "navigationColor": "#0f172a",
+  "navigationColorDark": "#0f172a",
+  "navigationDividerColor": "#0f172a",
+  "navigationDividerColorDark": "#0f172a",
+  "backgroundColor": "#0f172a",
+  "enableNotifications": false,
+  "startUrl": "/OS-list-manager/",
+  "iconUrl": "https://img.icons8.com/color/512/checklist--v1.png",
+  "maskableIconUrl": "https://img.icons8.com/color/512/checklist--v1.png",
+  "monochromeIconUrl": "https://img.icons8.com/color/512/checklist--v1.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./keystore/os-list-manager.keystore",
+    "alias": "oslistmanager"
+  },
+  "appVersionCode": 1,
+  "appVersionName": "1.0.0",
+  "queries": [],
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://oliviersud.github.io/OS-list-manager/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "orientation": "default",
+  "fingerprints": []
+}

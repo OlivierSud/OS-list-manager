@@ -1,0 +1,7 @@
+# Fichiers générés automatiquement — Ne pas versionner
+android/
+output/
+keystore/
+well-known-output/
+*.jks
+*.keystore
