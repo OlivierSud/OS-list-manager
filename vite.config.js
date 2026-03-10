@@ -5,6 +5,10 @@ import { VitePWA } from 'vite-plugin-pwa'
 // https://vitejs.dev/config/
 export default defineConfig({
   base: './',
+  server: {
+    host: true, // Permet l'accès depuis d'autres appareils (mobile)
+    port: 5173,
+  },
   plugins: [
     react(),
     VitePWA({
