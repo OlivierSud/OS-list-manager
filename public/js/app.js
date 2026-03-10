@@ -2812,9 +2812,8 @@ if ('serviceWorker' in navigator) {
                 installingWorker.onstatechange = () => {
                     if (installingWorker.state === 'installed') {
                         if (navigator.serviceWorker.controller) {
-                            console.log('New content is available; please refresh.');
-                            // Notification discrète au lieu d'un popup bloquant
-                            setTimeout(() => { if (window.location) window.location.reload(); }, 1000);
+                            console.log('New content available. Close and reopen to update.');
+                            // On ne recharge PLUS automatiquement pour éviter les boucles
                         }
                     }
                 };
