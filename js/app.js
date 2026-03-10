@@ -263,18 +263,38 @@ async function handleLogout() {
 window.handleLogout = handleLogout;
 
 async function handleAuthClick() {
+    console.log("Tentative de connexion cliquée...");
+    if (!window.supabaseClient) {
+        console.error("Erreur: supabaseClient n'est pas initialisé !");
+        alert("Erreur de chargement de Supabase. Veuillez rafraîchir la page.");
+        return;
+    }
+
+    const redirectUrl = window.location.origin + window.location.pathname;
+    console.log("Redirection vers :", redirectUrl);
+
     const { data, error } = await supabaseClient.auth.signInWithOAuth({
         provider: 'google',
         options: {
-            redirectTo: window.location.origin + window.location.pathname
+            redirectTo: redirectUrl
         }
     });
 
     if (error) {
         console.error("Supabase Auth Error:", error);
+        alert("Erreur d'authentification : " + error.message);
     }
 }
 window.handleAuthClick = handleAuthClick;
+
+// Force l'attachement du bouton au démarrage
+document.addEventListener('DOMContentLoaded', () => {
+    const loginBtn = document.getElementById('login-button');
+    if (loginBtn) {
+        loginBtn.addEventListener('click', handleAuthClick);
+        console.log("Événement de connexion attaché au bouton.");
+    }
+});
 
 async function fetchSupabaseData() {
     if (!state.userEmail) return;
