@@ -178,20 +178,50 @@ let state = {
 // PWA Install Prompt
 let deferredPrompt;
 const pwaBanner = document.getElementById('pwa-install-banner');
+const btnPwaInstall = document.getElementById('btn-pwa-install');
+const pwaInstallDesc = document.getElementById('pwa-install-desc');
 
+// Helpers iOS
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isSafari = () => /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+function checkAndShowPWABanner() {
+    if (isStandalone()) return;
+
+    // Detect if we are on iOS Safari
+    if (isIOS() && isSafari()) {
+        if (pwaBanner) pwaBanner.classList.remove('hidden');
+        if (btnPwaInstall) {
+            btnPwaInstall.innerText = "Comment ?";
+            btnPwaInstall.onclick = () => {
+                alert("Pour installer l'app sur iPhone :\n1. Appuyez sur l'icône Partager (carré avec flèche) en bas de l'écran.\n2. Sélectionnez 'Sur l'écran d'accueil'.");
+            };
+        }
+        if (pwaInstallDesc) {
+            pwaInstallDesc.innerText = "Ajoutez à l'écran d'accueil via le menu Partager";
+        }
+    } 
+    // Android case : wait for beforeinstallprompt
+}
+
+// Android Event
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
     console.log('PWA persistent prompt ready');
 
-    // Show banner only if we are in Home view AND not already installed
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    if (state.view === 'home' && !isStandalone) {
+    if (!isStandalone()) {
         if (pwaBanner) pwaBanner.classList.remove('hidden');
     }
 });
 
-// Function to trigger PWA install manually if needed
+// Check iOS on load
+document.addEventListener('DOMContentLoaded', () => {
+    checkAndShowPWABanner();
+});
+
+// Function to trigger PWA install manually if needed (Android)
 function installPWAFromBanner() {
     if (deferredPrompt) {
         deferredPrompt.prompt();
@@ -202,6 +232,9 @@ function installPWAFromBanner() {
             }
             deferredPrompt = null;
         });
+    } else if (!isIOS()) {
+         // Fallback Android manuel
+         alert("Ouvrez le menu du navigateur (3 points) et sélectionnez 'Ajouter à l'écran d'accueil'.");
     }
 }
 
