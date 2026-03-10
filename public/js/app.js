@@ -187,43 +187,47 @@ const isSafari = () => /^((?!chrome|android).)*safari/i.test(navigator.userAgent
 const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 
 function checkAndShowPWABanner() {
+    // Si l'application est déjà installée, on affiche rien.
     if (isStandalone()) return;
 
-    // Detect if we are on iOS Safari
+    // FORCER L'AFFICHAGE DE LA BANNIERE QUOI QU'IL ARRIVE
+    if (pwaBanner) {
+        pwaBanner.classList.remove('hidden');
+    }
+
+    // Gestion de l'affichage spécifique (textes) selon l'OS
     if (isIOS() && isSafari()) {
-        if (pwaBanner) pwaBanner.classList.remove('hidden');
         if (btnPwaInstall) {
             btnPwaInstall.innerText = "Comment ?";
             btnPwaInstall.onclick = () => {
-                alert("Pour installer l'app sur iPhone :\n1. Appuyez sur l'icône Partager (carré avec flèche) en bas de l'écran.\n2. Sélectionnez 'Sur l'écran d'accueil'.");
+                alert("Pour installer l'app sur iPhone :\n\n1. Appuyez sur l'icône Partager (le petit carré avec flèche haut) en bas de l'écran.\n2. Sélectionnez 'Sur l'écran d'accueil'.");
             };
         }
         if (pwaInstallDesc) {
             pwaInstallDesc.innerText = "Ajoutez à l'écran d'accueil via le menu Partager";
         }
-    } 
-    // Android case : wait for beforeinstallprompt
+    }
 }
 
-// Android Event
+// Android Event (se déclenche si l'app remplit tous les critères Google)
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    console.log('PWA persistent prompt ready');
-
-    if (!isStandalone()) {
-        if (pwaBanner) pwaBanner.classList.remove('hidden');
-    }
+    console.log('PWA persistent prompt ready (Android effectif)');
 });
 
-// Check iOS on load
+// Forcer la vérification et l'affichage de la bannière dès que le DOM est chargé !
 document.addEventListener('DOMContentLoaded', () => {
-    checkAndShowPWABanner();
+    // Petit délai d'une demi-seconde pour s'assurer que le container n'est pas masqué par autre chose
+    setTimeout(() => {
+        checkAndShowPWABanner();
+    }, 500);
 });
 
-// Function to trigger PWA install manually if needed (Android)
+// Function to trigger PWA install manually if needed
 function installPWAFromBanner() {
     if (deferredPrompt) {
+        // Le vrai prompt Android
         deferredPrompt.prompt();
         deferredPrompt.userChoice.then((choiceResult) => {
             if (choiceResult.outcome === 'accepted') {
@@ -232,9 +236,11 @@ function installPWAFromBanner() {
             }
             deferredPrompt = null;
         });
-    } else if (!isIOS()) {
-         // Fallback Android manuel
-         alert("Ouvrez le menu du navigateur (3 points) et sélectionnez 'Ajouter à l'écran d'accueil'.");
+    } else {
+        // Fallback manuel si l'API est absente (ex: mode incognito Android, navigateur tiers...)
+        if (!isIOS()) {
+            alert("Pour installer l'application :\n\n1. Ouvrez le menu de votre navigateur (les 3 petits points en haut à droite).\n2. Sélectionnez 'Ajouter à l'écran d'accueil' ou 'Installer l'application'.");
+        }
     }
 }
 
