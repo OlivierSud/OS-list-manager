@@ -15,60 +15,72 @@ const isStandalone = () =>
     window.navigator.standalone === true
 
 export default function InstallPWA() {
-    const [installPrompt, setInstallPrompt] = useState(null)  // événement Android
+    const [installPrompt, setInstallPrompt] = useState(null)
     const [showBanner, setShowBanner] = useState(false)
     const [showIOSGuide, setShowIOSGuide] = useState(false)
-    const [platform, setPlatform] = useState(null) // 'android' | 'ios' | null
+    const [showAndroidGuide, setShowAndroidGuide] = useState(false)
+    const [platform, setPlatform] = useState('android') // par defaut on suppose android/autre
 
     useEffect(() => {
-        // Ne pas afficher si déjà installée
+        // 1. Ne pas afficher si on est déjà installé (PWA standalone)
         if (isStandalone()) return
 
-        // Ne pas afficher si déjà refusé (dans les 7 derniers jours)
+        // 2. Ne pas afficher si l'user a dismiss récemment
         const dismissed = localStorage.getItem('pwa-install-dismissed')
         if (dismissed) {
             const daysSince = (Date.now() - parseInt(dismissed)) / (1000 * 60 * 60 * 24)
             if (daysSince < 7) return
         }
 
-        // Cas Android/Chrome : on écoute beforeinstallprompt
+        // On détermine la configuration de l'appareil
+        const isAppIOS = isIOS()
+        const isAppSafari = isSafari()
+
+        if (isAppIOS) {
+            setPlatform('ios')
+        }
+
+        // 3. Capturer l'événement natif Android (s'il se déclenche)
         const handleBeforeInstall = (e) => {
             e.preventDefault()
             setInstallPrompt(e)
             setPlatform('android')
-            setShowBanner(true)
         }
         window.addEventListener('beforeinstallprompt', handleBeforeInstall)
 
-        // Cas iOS/Safari : on affiche les instructions manuelles
-        if (isIOS() && isSafari()) {
-            setPlatform('ios')
-            // Petit délai pour ne pas agresser l'utilisateur dès l'arrivée
-            const timer = setTimeout(() => setShowBanner(true), 2500)
-            return () => {
-                clearTimeout(timer)
-                window.removeEventListener('beforeinstallprompt', handleBeforeInstall)
-            }
-        }
+        // 4. Afficher la bannière quoiqu'il arrive après 1 seconde (si pas standalone)
+        const timer = setTimeout(() => setShowBanner(true), 1000)
 
-        return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall)
+        return () => {
+            clearTimeout(timer)
+            window.removeEventListener('beforeinstallprompt', handleBeforeInstall)
+        }
     }, [])
 
-    // Bouton "Installer" → déclenche le prompt natif Android
     const handleInstallClick = async () => {
-        if (!installPrompt) return
-        await installPrompt.prompt()
-        const { outcome } = await installPrompt.userChoice
-        if (outcome === 'accepted') {
-            setShowBanner(false)
+        if (platform === 'ios') {
+            setShowIOSGuide(true)
+            return
         }
-        setInstallPrompt(null)
+
+        // Android
+        if (installPrompt) {
+            await installPrompt.prompt()
+            const { outcome } = await installPrompt.userChoice
+            if (outcome === 'accepted') {
+                setShowBanner(false)
+            }
+            setInstallPrompt(null)
+        } else {
+            // Si on n'a pas eu l'événement (navigateur non supporté, ou dev local)
+            setShowAndroidGuide(true)
+        }
     }
 
-    // Fermer et mémoriser le refus
     const handleDismiss = () => {
         setShowBanner(false)
         setShowIOSGuide(false)
+        setShowAndroidGuide(false)
         localStorage.setItem('pwa-install-dismissed', Date.now().toString())
     }
 
@@ -144,47 +156,27 @@ export default function InstallPWA() {
                                 </p>
                             </div>
 
-                            {/* Bouton d'action */}
-                            {platform === 'android' ? (
-                                <button
-                                    onClick={handleInstallClick}
-                                    style={{
-                                        background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '0.65rem',
-                                        padding: '0.55rem 1rem',
-                                        fontWeight: 600,
-                                        fontSize: '0.85rem',
-                                        cursor: 'pointer',
-                                        flexShrink: 0,
-                                        boxShadow: '0 4px 12px rgba(59,130,246,0.4)',
-                                        transition: 'transform 0.15s, box-shadow 0.15s',
-                                    }}
-                                    onMouseDown={e => e.currentTarget.style.transform = 'scale(0.96)'}
-                                    onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
-                                >
-                                    Installer
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={() => setShowIOSGuide(true)}
-                                    style={{
-                                        background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '0.65rem',
-                                        padding: '0.55rem 1rem',
-                                        fontWeight: 600,
-                                        fontSize: '0.85rem',
-                                        cursor: 'pointer',
-                                        flexShrink: 0,
-                                        boxShadow: '0 4px 12px rgba(59,130,246,0.4)',
-                                    }}
-                                >
-                                    Comment ?
-                                </button>
-                            )}
+                            {/* Bouton d'action commun */}
+                            <button
+                                onClick={handleInstallClick}
+                                style={{
+                                    background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '0.65rem',
+                                    padding: '0.55rem 1rem',
+                                    fontWeight: 600,
+                                    fontSize: '0.85rem',
+                                    cursor: 'pointer',
+                                    flexShrink: 0,
+                                    boxShadow: '0 4px 12px rgba(59,130,246,0.4)',
+                                    transition: 'transform 0.15s, box-shadow 0.15s',
+                                }}
+                                onMouseDown={e => e.currentTarget.style.transform = 'scale(0.96)'}
+                                onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+                            >
+                                {platform === 'ios' || (!installPrompt && platform !== 'ios') ? 'Comment ?' : 'Installer'}
+                            </button>
 
                             {/* Bouton fermer */}
                             <button
@@ -328,9 +320,100 @@ export default function InstallPWA() {
                                         border: '1px solid rgba(59,130,246,0.2)',
                                     }}>
                                         <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8' }}>
-                                            ⚠️ Disponible uniquement via <strong style={{ color: '#f8fafc' }}>Safari</strong>. Chrome et Firefox ne supportent pas cette fonctionnalité sur iOS.
+                                            ⚠️ Disponible via <strong style={{ color: '#f8fafc' }}>Safari</strong>.
                                         </p>
                                     </div>
+                                </motion.div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* ── Guide Android manuel (si pas d'événement) ───────── */}
+                    <AnimatePresence>
+                        {showAndroidGuide && (
+                            <motion.div
+                                key="android-guide"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={handleDismiss}
+                                style={{
+                                    position: 'fixed',
+                                    inset: 0,
+                                    background: 'rgba(0,0,0,0.7)',
+                                    zIndex: 1001,
+                                    display: 'flex',
+                                    alignItems: 'flex-end',
+                                    justifyContent: 'center',
+                                    padding: '1rem',
+                                }}
+                            >
+                                <motion.div
+                                    initial={{ y: 60, opacity: 0 }}
+                                    animate={{ y: 0, opacity: 1 }}
+                                    exit={{ y: 60, opacity: 0 }}
+                                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                                    onClick={e => e.stopPropagation()}
+                                    style={{
+                                        background: 'rgba(15, 23, 42, 0.98)',
+                                        backdropFilter: 'blur(24px)',
+                                        border: '1px solid rgba(59,130,246,0.3)',
+                                        borderRadius: '1.5rem',
+                                        padding: '1.75rem',
+                                        width: '100%',
+                                        maxWidth: '400px',
+                                        boxShadow: '0 -8px 40px rgba(0,0,0,0.6)',
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+                                        <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#f8fafc' }}>
+                                            Installer sur Android
+                                        </h2>
+                                        <button onClick={handleDismiss} style={{
+                                            background: 'rgba(255,255,255,0.08)',
+                                            border: 'none',
+                                            borderRadius: '50%',
+                                            width: '32px',
+                                            height: '32px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            cursor: 'pointer',
+                                            color: '#94a3b8',
+                                            padding: 0,
+                                        }}>
+                                            <X size={15} />
+                                        </button>
+                                    </div>
+
+                                    {[
+                                        {
+                                            icon: <span style={{ fontWeight: 'bold' }}>⋮</span>,
+                                            step: '1',
+                                            title: 'Ouvrez le menu',
+                                            desc: 'Appuyez sur les 3 points en haut à droite',
+                                        },
+                                        {
+                                            icon: <Download size={20} color="#3b82f6" />,
+                                            step: '2',
+                                            title: '"Ajouter à l\'écran d\'accueil"',
+                                            desc: 'Dans la liste des options',
+                                        },
+                                    ].map(({ icon, step, title, desc }) => (
+                                        <div key={step} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1.1rem' }}>
+                                            <div style={{
+                                                width: '40px', height: '40px', borderRadius: '10px',
+                                                background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                            }}>
+                                                {icon}
+                                            </div>
+                                            <div>
+                                                <p style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem', color: '#f8fafc' }}>{step}. {title}</p>
+                                                <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>{desc}</p>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </motion.div>
                             </motion.div>
                         )}
