@@ -2807,18 +2807,18 @@ if ('serviceWorker' in navigator) {
             console.log('SW Registered (v5)');
 
             // Check for updates
-            registration.addEventListener('updatefound', () => {
-                const newWorker = registration.installing;
-                newWorker.addEventListener('statechange', () => {
-                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                        // There's a new version!
-                        console.log('New content detected! Refreshing...');
-                        if (confirm('Une nouvelle version est disponible (sans les points blancs). Voulez-vous rafraîchir maintenant ?')) {
-                            window.location.reload();
+            registration.onupdatefound = () => {
+                const installingWorker = registration.installing;
+                installingWorker.onstatechange = () => {
+                    if (installingWorker.state === 'installed') {
+                        if (navigator.serviceWorker.controller) {
+                            console.log('New content is available; please refresh.');
+                            // Notification discrète au lieu d'un popup bloquant
+                            setTimeout(() => { if (window.location) window.location.reload(); }, 1000);
                         }
                     }
-                });
-            });
+                };
+            };
         }).catch(err => {
             console.error('SW Registration failed:', err);
         });
