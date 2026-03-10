@@ -1188,32 +1188,6 @@ h1 {
     }
 }
 
-/* Magic Reveal Particles */
-.magic-particle {
-    position: fixed;
-    border-radius: 50%;
-    z-index: 10001;
-    pointer-events: none;
-    box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
-    background: white;
-}
-
-@keyframes curtain-fall {
-    0% {
-        transform: translateY(0) scale(0);
-        opacity: 0;
-    }
-
-    10% {
-        opacity: 1;
-        transform: translateY(5vh) scale(1.2);
-    }
-
-    100% {
-        transform: translateY(110vh) scale(0.5);
-        opacity: 0;
-    }
-}
 
 /* Enhanced Page Reveal with Glow - Adjusted for Curtain */
 @keyframes pageReveal {

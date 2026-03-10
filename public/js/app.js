@@ -1505,36 +1505,6 @@ function fireExplosionBurst(x, y) {
     }
 }
 
-function fireCurtainParticles() {
-    const colors = ['#eb7600', '#fff']; // Restricted palette: Blender Orange and White
-    const count = 250; // Dense curtain effect
-
-    for (let i = 0; i < count; i++) {
-        const p = document.createElement('div');
-        p.className = 'magic-particle'; // Keep the same class as it has the shadow/bg styles
-
-        const size = Math.random() * 5 + 2; // Slightly smaller for higher density without clutter
-        const color = colors[Math.floor(Math.random() * colors.length)];
-
-        // Random horizontal position
-        const startX = Math.random() * window.innerWidth;
-        const startY = -20 - (Math.random() * 50); // Stagger the start Y slightly
-
-        p.style.left = startX + 'px';
-        p.style.top = startY + 'px';
-        p.style.width = size + 'px';
-        p.style.height = size + 'px';
-        p.style.backgroundColor = color;
-        p.style.boxShadow = `0 0 12px ${color}`;
-
-        const duration = 2.0 + Math.random() * 1.5;
-        const delay = Math.random() * 0.8; // More delay spread
-        p.style.animation = `curtain-fall ${duration}s ease-in ${delay}s forwards`;
-
-        document.body.appendChild(p);
-        setTimeout(() => p.remove(), (duration + delay) * 1000);
-    }
-}
 
 function startInlineEdit(element, index) {
     // Prevent re-triggering if already editing
@@ -2374,8 +2344,6 @@ window.onload = function () {
         app.classList.remove('page-reveal');
         void app.offsetWidth; // Force reflow
         app.classList.add('page-reveal');
-        // Spawn curtain particles
-        fireCurtainParticles();
     }
 
     // Initialize settings button as hidden
