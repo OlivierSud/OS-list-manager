@@ -211,9 +211,10 @@ function checkAndShowPWABanner() {
 
 // Android Event (se déclenche si l'app remplit tous les critères Google)
 window.addEventListener('beforeinstallprompt', (e) => {
+    console.log('beforeinstallprompt fired');
     e.preventDefault();
     deferredPrompt = e;
-    console.log('PWA persistent prompt ready (Android effectif)');
+    console.log('PWA Install Prompt ready');
 });
 
 // Forcer la vérification et l'affichage de la bannière dès que le DOM est chargé !
@@ -2811,22 +2812,23 @@ window.onload = function () {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then(registration => {
-            console.log('SW Registered (v5)');
+            console.log('Service Worker Registered (v22)');
 
-            // Check for updates
             registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
                 installingWorker.onstatechange = () => {
                     if (installingWorker.state === 'installed') {
                         if (navigator.serviceWorker.controller) {
-                            console.log('New content available. Close and reopen to update.');
-                            // On ne recharge PLUS automatiquement pour éviter les boucles
+                            console.log('Nouveau contenu disponible. Veuillez rafraîchir la page.');
+                            // Optionnel: on peut forcer le refresh ici si on est sûr de soi
+                        } else {
+                            console.log('Contenu mis en cache pour une utilisation hors ligne.');
                         }
                     }
                 };
             };
         }).catch(err => {
-            console.error('SW Registration failed:', err);
+            console.error('Service Worker registration failed:', err);
         });
     });
 }
