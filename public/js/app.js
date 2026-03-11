@@ -80,20 +80,21 @@ const isStandalone = () => window.matchMedia('(display-mode: standalone)').match
 
 function checkAndShowPWABanner() {
     console.log("Checking PWA Banner... standalone:", isStandalone(), "prompt:", !!window.deferredPrompt);
-    if (isStandalone()) return;
+    if (isStandalone()) {
+        if (pwaBanner) pwaBanner.classList.add('hidden');
+        return;
+    }
+
+    if (pwaBanner) pwaBanner.classList.remove('hidden');
+    updatePWAButtonState();
 
     if (isIOS()) {
-        if (pwaBanner) pwaBanner.classList.remove('hidden');
         if (btnPwaInstall) {
             btnPwaInstall.innerText = "Comment ?";
-            btnPwaInstall.onclick = () => {
-                alert("Installation iPhone :\n\n1. Appuyez sur Partager (□↑)\n2. Sélectionnez 'Sur l'écran d'accueil'.");
+            btnPwaInstall.onclick = (e) => {
+                e.preventDefault();
+                installPWAFromBanner();
             };
-        }
-    } else {
-        if (pwaBanner) pwaBanner.classList.remove('hidden');
-        if (btnPwaInstall) {
-            btnPwaInstall.innerText = window.deferredPrompt ? "Installer" : "Vérification...";
         }
     }
 }
@@ -105,20 +106,46 @@ window.addEventListener('beforeinstallprompt', (e) => {
     if (btnPwaInstall) btnPwaInstall.innerText = "Installer";
 });
 
+function updatePWAButtonState() {
+    if (!btnPwaInstall) return;
+    if (window.deferredPrompt) {
+        btnPwaInstall.innerText = "Installer";
+        btnPwaInstall.style.background = "var(--accent-color)";
+        btnPwaInstall.style.color = "white";
+    } else if (!isIOS()) {
+        btnPwaInstall.innerText = "Vérification...";
+    }
+}
+window.updatePWAButtonState = updatePWAButtonState;
+
 async function installPWAFromBanner() {
     if (window.deferredPrompt) {
         try {
+            console.log("Triggering PWA Install prompt...");
             await window.deferredPrompt.prompt();
             const { outcome } = await window.deferredPrompt.userChoice;
+            console.log(`PWA install user choice: ${outcome}`);
             if (outcome === 'accepted') {
                 if (pwaBanner) pwaBanner.classList.add('hidden');
+                window.deferredPrompt = null;
             }
-            window.deferredPrompt = null;
         } catch (err) {
             console.error("Installation error:", err);
+            alert("Erreur lors de l'installation : " + err.message);
         }
-    } else if (!isIOS()) {
-        alert("Le navigateur n'a pas encore validé l'installation.\n\nVérifiez que vous n'êtes pas en navigation privée et attendez 10 secondes.");
+    } else {
+        if (isIOS()) {
+            alert("Installation iPhone :\n\n1. Appuyez sur Partager (□↑)\n2. Sélectionnez 'Sur l'écran d'accueil'.");
+        } else {
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const isInsecure = window.location.protocol !== 'https:' && !isLocal;
+            
+            if (isInsecure) {
+                alert("Installation bloquée : PWA nécessite une connexion sécurisée (HTTPS).\n\nVeuillez utiliser l'adresse sécurisée de votre site.");
+            } else {
+                alert("Le navigateur n'a pas encore validé l'installation (Événement 'beforeinstallprompt' non reçu).\n\nCauses possibles :\n- Application déjà installée\n- Navigation privée (Incognito)\n- Connexion trop lente (Service Worker en chargement)\n- Manifest non reconnu");
+            }
+        }
     }
 }
 window.installPWAFromBanner = installPWAFromBanner;
@@ -128,7 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Cache versions
-const JS_VERSION = "32";
+const JS_VERSION = "33";
 console.log(`App loaded (v${JS_VERSION})`);
 
 // Color palette for lists
@@ -2658,7 +2685,7 @@ window.onload = function () {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then(registration => {
-            console.log('Service Worker Registered (v27)');
+            console.log('Service Worker Registered (v33)');
 
             registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
