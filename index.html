@@ -25,6 +25,18 @@
 
   <!-- Styles -->
   <link rel="stylesheet" href="css/style.css?v=6">
+
+  <!-- Early PWA Capture -->
+  <script>
+    window.deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      window.deferredPrompt = e;
+      console.log('✅ Installation PWA autorisée par le navigateur.');
+      // Si la fonction de mise à jour existe déjà dans app.js
+      if (window.updatePWAButtonState) window.updatePWAButtonState();
+    });
+  </script>
 </head>
 
 <body>

@@ -175,11 +175,17 @@ let state = {
     shares: [] // For sharing
 };
 
-// PWA Install Prompt
-let deferredPrompt;
+// PWA Install Prompt (Global access from index.html)
 const pwaBanner = document.getElementById('pwa-install-banner');
 const btnPwaInstall = document.getElementById('btn-pwa-install');
 const pwaInstallDesc = document.getElementById('pwa-install-desc');
+
+window.updatePWAButtonState = function() {
+    if (btnPwaInstall && window.deferredPrompt) {
+        btnPwaInstall.innerText = "Installer l'app";
+        btnPwaInstall.style.background = "var(--accent-color)";
+    }
+};
 
 // Helpers iOS
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -201,26 +207,16 @@ function checkAndShowPWABanner() {
             pwaInstallDesc.innerText = "Ajoutez à l'écran d'accueil via le menu Partager";
         }
     } else if (!isIOS()) {
-        // Fallback Android: On affiche d'office car certains événements tardent.
         if (pwaBanner) pwaBanner.classList.remove('hidden');
-        if (btnPwaInstall) {
-            btnPwaInstall.innerText = "Installer";
-        }
+        window.updatePWAButtonState();
     }
 }
 
-// Android Event (se déclenche si l'app remplit tous les critères Google)
+// Android Event (Doublon de sécurité au cas où l'app.js charge avant early capture)
 window.addEventListener('beforeinstallprompt', (e) => {
-    console.log('beforeinstallprompt fired');
     e.preventDefault();
-    deferredPrompt = e;
-    
-    // Sur Android, on affiche la bannière dès que le navigateur est prêt à installer
-    if (pwaBanner && !isStandalone()) {
-        pwaBanner.classList.remove('hidden');
-        if (btnPwaInstall) btnPwaInstall.innerText = "Installer";
-    }
-    console.log('PWA Install Prompt ready');
+    window.deferredPrompt = e;
+    window.updatePWAButtonState();
 });
 
 // Forcer la vérification et l'affichage de la bannière dès que le DOM est chargé !
@@ -233,52 +229,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Function to trigger PWA install manually if needed
 async function installPWAFromBanner() {
-    console.log("Tentative d'installation. Statut du prompt :", !!deferredPrompt);
+    const isHTTPS = window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     
-    if (deferredPrompt) {
+    if (!isHTTPS) {
+        alert("⚠️ Sécurité Android : L'installation PWA est bloquée par Chrome car vous n'êtes pas sur un site sécurisé (HTTPS).\n\nPour installer, accédez au site via une adresse https://.");
+        return;
+    }
+
+    if (window.deferredPrompt) {
         try {
-            // Le vrai prompt Android
-            await deferredPrompt.prompt();
-            
-            // Attendre le choix de l'utilisateur
-            const { outcome } = await deferredPrompt.userChoice;
-            console.log('Résultat de l\'installation :', outcome);
-            
+            await window.deferredPrompt.prompt();
+            const { outcome } = await window.deferredPrompt.userChoice;
             if (outcome === 'accepted') {
-                console.log('Installation acceptée.');
-                if (pwaBanner) pwaBanner.classList.add('hidden');
-            } else {
-                console.log('Installation refusée par l\'utilisateur.');
-                // On peut choisir de laisser la bannière ou de la cacher.
-                // Ici on la cache pour ne pas être trop intrusif après un refus.
                 if (pwaBanner) pwaBanner.classList.add('hidden');
             }
-            
-            // On reset le prompt dans tous les cas car il n'est plus utilisable
-            deferredPrompt = null;
+            window.deferredPrompt = null;
         } catch (err) {
-            console.error("Erreur lors de l'appel au prompt PWA:", err);
-            // On ne cache pas la bannière en cas d'erreur technique
+            console.error("Erreur prompt:", err);
         }
     } else {
         if (isIOS()) {
-            // Déjà géré par l'onclick spécifique dans checkAndShowPWABanner
+            // Déjà géré
         } else {
-            console.log("Le prompt d'installation n'est pas prêt.");
             if (btnPwaInstall) {
-                const originalText = btnPwaInstall.innerText;
-                btnPwaInstall.innerText = "Patientez...";
-                btnPwaInstall.style.opacity = "0.7";
-                
-                setTimeout(() => {
-                    btnPwaInstall.innerText = originalText;
-                    btnPwaInstall.style.opacity = "1";
-                }, 3000);
+                btnPwaInstall.innerText = "Attente système...";
+                setTimeout(() => { if (btnPwaInstall) btnPwaInstall.innerText = "Installer"; }, 3000);
             }
-            
-            // On NE cache PAS la bannière. On explique pourquoi ça bloque.
-            alert("L'installation est en cours de préparation par votre navigateur. \n\nRéessayez dans quelques secondes quand le bouton redeviendra actif.");
-            console.warn("L'événement 'beforeinstallprompt' n'a pas encore été reçu.");
+            alert("Votre navigateur Chrome n'a pas encore validé l'installation. \n\nConseils :\n1. Restez 15 secondes sur la page.\n2. Vérifiez que vous n'êtes pas en navigation privée.\n3. Vérifiez que l'app n'est pas déjà installée.");
         }
     }
 }
@@ -2857,7 +2834,7 @@ window.onload = function () {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then(registration => {
-            console.log('Service Worker Registered (v26)');
+            console.log('Service Worker Registered (v27)');
 
             registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
