@@ -155,8 +155,13 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Cache versions
-const JS_VERSION = "35";
+const JS_VERSION = "36";
 console.log(`App loaded (v${JS_VERSION})`);
+
+// Diagnostic Manifest
+fetch('manifest.json').then(r => {
+    console.log(`Manifest check: status=${r.status}, type=${r.headers.get('content-type')}`);
+}).catch(e => console.error('Manifest fetch failed:', e));
 
 // Color palette for lists
 const COLOR_PALETTE = [
@@ -2685,7 +2690,7 @@ window.onload = function () {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then(registration => {
-            console.log('Service Worker Registered (v35)');
+            console.log('Service Worker Registered (v36)');
 
             registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
