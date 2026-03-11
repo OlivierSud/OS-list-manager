@@ -190,9 +190,13 @@ function checkAndShowPWABanner() {
     // Si l'application est déjà installée, on affiche rien.
     if (isStandalone()) return;
 
-    // iOS/Safari: On affiche les instructions manuelles
+    // On affiche la bannière par défaut pour mobile
+    if (pwaBanner) {
+        pwaBanner.classList.remove('hidden');
+    }
+
+    // Ajustement des labels / actions selon la plateforme
     if (isIOS() && isSafari()) {
-        if (pwaBanner) pwaBanner.classList.remove('hidden');
         if (btnPwaInstall) {
             btnPwaInstall.innerText = "Comment ?";
             btnPwaInstall.onclick = () => {
@@ -202,11 +206,11 @@ function checkAndShowPWABanner() {
         if (pwaInstallDesc) {
             pwaInstallDesc.innerText = "Ajoutez à l'écran d'accueil via le menu Partager";
         }
-    } 
-    // Android: On n'affiche la bannière que si deferredPrompt est déjà prêt (cas rare)
-    // Sinon, c'est l'event 'beforeinstallprompt' qui s'en chargera plus bas
-    else if (deferredPrompt) {
-        if (pwaBanner) pwaBanner.classList.remove('hidden');
+    } else {
+        // Android / Autres : On garde le bouton "Installer" par défaut
+        if (btnPwaInstall) {
+            btnPwaInstall.innerText = "Installer";
+        }
     }
 }
 
@@ -2829,7 +2833,7 @@ window.onload = function () {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then(registration => {
-            console.log('Service Worker Registered (v22)');
+            console.log('Service Worker Registered (v23)');
 
             registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
