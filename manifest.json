@@ -8,9 +8,9 @@
     "description": "Gérez vos listes de tâches synchronisées avec Google Sheets.",
     "icons": [
         {
-            "src": "icone_ListManager.png",
+            "src": "icone_ListManager.jpg",
             "sizes": "192x192 512x512",
-            "type": "image/png",
+            "type": "image/jpeg",
             "purpose": "any maskable"
         }
     ]
