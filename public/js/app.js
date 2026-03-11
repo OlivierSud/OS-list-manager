@@ -79,9 +79,10 @@ const isSafari = () => /^((?!chrome|android).)*safari/i.test(navigator.userAgent
 const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 
 function checkAndShowPWABanner() {
+    console.log("Checking PWA Banner... standalone:", isStandalone(), "prompt:", !!window.deferredPrompt);
     if (isStandalone()) return;
 
-    if (isIOS() && isSafari()) {
+    if (isIOS()) {
         if (pwaBanner) pwaBanner.classList.remove('hidden');
         if (btnPwaInstall) {
             btnPwaInstall.innerText = "Comment ?";
@@ -89,7 +90,7 @@ function checkAndShowPWABanner() {
                 alert("Installation iPhone :\n\n1. Appuyez sur Partager (□↑)\n2. Sélectionnez 'Sur l'écran d'accueil'.");
             };
         }
-    } else if (!isIOS()) {
+    } else {
         if (pwaBanner) pwaBanner.classList.remove('hidden');
         if (btnPwaInstall) {
             btnPwaInstall.innerText = window.deferredPrompt ? "Installer" : "Vérification...";
@@ -126,12 +127,30 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(checkAndShowPWABanner, 500);
 });
 
-// Cache versions (Simplified for this fix)
-const JS_VERSION = "30";
+// Cache versions
+const JS_VERSION = "32";
 console.log(`App loaded (v${JS_VERSION})`);
 
-// ... Rest of the application logic starts here ...
-// (I will keep the functional parts of your app.js)
+// Color palette for lists
+const COLOR_PALETTE = [
+    '#eb7600', // Blender Orange
+    '#3b82f6', // Blue
+    '#10b981', // Green
+    '#8b5cf6', // Purple
+    '#ef4444', // Red
+    '#f59e0b', // Amber
+    '#ec4899', // Pink
+    '#06b6d4', // Cyan
+    '#84cc16', // Lime
+    '#f97316', // Orange
+    '#6366f1', // Indigo
+    '#14b8a6'  // Teal
+];
+
+async function handleAuthClick() {
+    console.log("Tentative de connexion cliquée...");
+    if (!window.supabaseClient) {
+        console.error("Erreur: supabaseClient n'est pas initialisé !");
         alert("Erreur de chargement de Supabase. Veuillez rafraîchir la page.");
         return;
     }
@@ -162,6 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// Supabase Logic
 async function fetchSupabaseData() {
     if (!state.userEmail) return;
 
