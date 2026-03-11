@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#eb7600">
-  <link rel="manifest" href="manifest.json" crossorigin="use-credentials">
+  <link rel="manifest" href="manifest.json">
   <title>OS List Manager</title>
 
   <!-- PWA Settings -->
@@ -29,14 +29,19 @@
   <!-- Early PWA Capture -->
   <script>
     window.deferredPrompt = null;
+    console.log('--- PWA DIAGNOSTIC v35 ---');
+    console.log('Protocol:', window.location.protocol);
+    console.log('Hostname:', window.location.hostname);
+    
     window.addEventListener('beforeinstallprompt', (e) => {
-      console.log('⚡ beforeinstallprompt capturé par le script early');
+      console.log('✅ beforeinstallprompt capturé !');
       e.preventDefault();
       window.deferredPrompt = e;
       if (window.updatePWAButtonState) window.updatePWAButtonState();
     });
+    
     window.addEventListener('appinstalled', () => {
-      console.log('✅ Application installée avec succès !');
+      console.log('🎉 Application installée !');
       const banner = document.getElementById('pwa-install-banner');
       if (banner) banner.classList.add('hidden');
       window.deferredPrompt = null;
@@ -304,7 +309,7 @@
   </div>
 
   <script src="js/supabase-config.js"></script>
-  <script src="js/app.js?v=34"></script>
+  <script src="js/app.js?v=35"></script>
   <script>
     // Initialize Lucide Icons after load
     document.addEventListener("DOMContentLoaded", function () {

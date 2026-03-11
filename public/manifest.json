@@ -1,29 +1,23 @@
 {
+    "id": "os-list-manager-v1",
     "name": "OS List Manager",
     "short_name": "Mes Listes",
-    "description": "Gérez vos listes de tâches synchronisées avec Google Sheets et Supabase.",
-    "start_url": ".",
+    "description": "Gérez vos listes de tâches synchronisées avec Supabase.",
+    "start_url": "index.html",
     "scope": "./",
     "display": "standalone",
-    "orientation": "portrait",
     "background_color": "#0f172a",
     "theme_color": "#eb7600",
     "icons": [
         {
             "src": "icone_ListManager.jpg",
             "sizes": "192x192",
-            "type": "image/jpeg",
-            "purpose": "any"
+            "type": "image/jpeg"
         },
         {
             "src": "icone_ListManager.jpg",
             "sizes": "512x512",
-            "type": "image/jpeg",
-            "purpose": "any"
+            "type": "image/jpeg"
         }
-    ],
-    "categories": [
-        "productivity",
-        "utilities"
     ]
 }

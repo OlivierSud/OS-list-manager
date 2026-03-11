@@ -155,7 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Cache versions
-const JS_VERSION = "34";
+const JS_VERSION = "35";
 console.log(`App loaded (v${JS_VERSION})`);
 
 // Color palette for lists
@@ -2685,7 +2685,7 @@ window.onload = function () {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then(registration => {
-            console.log('Service Worker Registered (v34)');
+            console.log('Service Worker Registered (v35)');
 
             registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
