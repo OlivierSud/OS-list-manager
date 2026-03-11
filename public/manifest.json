@@ -2,6 +2,7 @@
   "name": "OS List Manager",
   "short_name": "Mes Listes",
   "description": "Gérez vos listes de tâches synchronisées avec Supabase.",
+  "id": "/OS-list-manager/",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -9,14 +10,32 @@
   "theme_color": "#eb7600",
   "icons": [
     {
-      "src": "icone_ListManager.jpg",
+      "src": "icon-512.png",
       "sizes": "192x192",
-      "type": "image/jpeg"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "icone_ListManager.jpg",
+      "src": "icon-512.png",
       "sizes": "512x512",
-      "type": "image/jpeg"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
+  ],
+  "categories": [
+    "productivity",
+    "utilities"
   ]
 }

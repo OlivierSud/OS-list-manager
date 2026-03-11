@@ -155,7 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Cache versions
-const JS_VERSION = "36";
+const JS_VERSION = "37";
 console.log(`App loaded (v${JS_VERSION})`);
 
 // Diagnostic Manifest
@@ -2690,7 +2690,7 @@ window.onload = function () {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then(registration => {
-            console.log('Service Worker Registered (v36)');
+            console.log('Service Worker Registered (v37)');
 
             registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
