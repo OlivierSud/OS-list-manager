@@ -190,13 +190,9 @@ function checkAndShowPWABanner() {
     // Si l'application est déjà installée, on affiche rien.
     if (isStandalone()) return;
 
-    // FORCER L'AFFICHAGE DE LA BANNIERE QUOI QU'IL ARRIVE
-    if (pwaBanner) {
-        pwaBanner.classList.remove('hidden');
-    }
-
-    // Gestion de l'affichage spécifique (textes) selon l'OS
+    // iOS/Safari: On affiche les instructions manuelles
     if (isIOS() && isSafari()) {
+        if (pwaBanner) pwaBanner.classList.remove('hidden');
         if (btnPwaInstall) {
             btnPwaInstall.innerText = "Comment ?";
             btnPwaInstall.onclick = () => {
@@ -206,6 +202,11 @@ function checkAndShowPWABanner() {
         if (pwaInstallDesc) {
             pwaInstallDesc.innerText = "Ajoutez à l'écran d'accueil via le menu Partager";
         }
+    } 
+    // Android: On n'affiche la bannière que si deferredPrompt est déjà prêt (cas rare)
+    // Sinon, c'est l'event 'beforeinstallprompt' qui s'en chargera plus bas
+    else if (deferredPrompt) {
+        if (pwaBanner) pwaBanner.classList.remove('hidden');
     }
 }
 
@@ -214,6 +215,12 @@ window.addEventListener('beforeinstallprompt', (e) => {
     console.log('beforeinstallprompt fired');
     e.preventDefault();
     deferredPrompt = e;
+    
+    // Sur Android, on affiche la bannière dès que le navigateur est prêt à installer
+    if (pwaBanner && !isStandalone()) {
+        pwaBanner.classList.remove('hidden');
+        if (btnPwaInstall) btnPwaInstall.innerText = "Installer";
+    }
     console.log('PWA Install Prompt ready');
 });
 
@@ -233,14 +240,24 @@ function installPWAFromBanner() {
         deferredPrompt.userChoice.then((choiceResult) => {
             if (choiceResult.outcome === 'accepted') {
                 console.log('User accepted the PWA install');
-                if (pwaBanner) pwaBanner.classList.add('hidden');
+            } else {
+                console.log('User dismissed the PWA install');
             }
+            // Dans tous les cas, on cache la bannière et on reset le prompt
+            if (pwaBanner) pwaBanner.classList.add('hidden');
             deferredPrompt = null;
         });
     } else {
-        // Fallback manuel si l'API est absente (ex: mode incognito Android, navigateur tiers...)
-        if (!isIOS()) {
-            alert("Pour installer l'application :\n\n1. Ouvrez le menu de votre navigateur (les 3 petits points en haut à droite).\n2. Sélectionnez 'Ajouter à l'écran d'accueil' ou 'Installer l'application'.");
+        // Fallback manuel si l'API est absente
+        if (isIOS()) {
+            // Ne devrait pas arriver ici car on a changé le onclick pour iOS dans checkAndShowPWABanner
+            alert("Pour installer l'app sur iPhone :\n\n1. Appuyez sur l'icône Partager\n2. Sélectionnez 'Sur l'écran d'accueil'.");
+        } else {
+            // Sur Android, on évite l'alerte "mode d'emploi" qui agace l'utilisateur.
+            // Si on arrive ici, c'est que le prompt n'est pas prêt. 
+            // On cache la bannière en attendant qu'elle soit réactivée par l'event.
+            if (pwaBanner) pwaBanner.classList.add('hidden');
+            console.log("Installation native non disponible pour le moment.");
         }
     }
 }
