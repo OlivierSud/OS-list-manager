@@ -187,29 +187,25 @@ const isSafari = () => /^((?!chrome|android).)*safari/i.test(navigator.userAgent
 const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 
 function checkAndShowPWABanner() {
-    // Si l'application est déjà installée, on affiche rien.
     if (isStandalone()) return;
 
-    // On affiche la bannière par défaut pour mobile
-    if (pwaBanner) {
-        pwaBanner.classList.remove('hidden');
-    }
-
-    // Ajustement des labels / actions selon la plateforme
     if (isIOS() && isSafari()) {
+        if (pwaBanner) pwaBanner.classList.remove('hidden');
         if (btnPwaInstall) {
             btnPwaInstall.innerText = "Comment ?";
             btnPwaInstall.onclick = () => {
-                alert("Pour installer l'app sur iPhone :\n\n1. Appuyez sur l'icône Partager (le petit carré avec flèche haut) en bas de l'écran.\n2. Sélectionnez 'Sur l'écran d'accueil'.");
+                alert("Pour installer l'app sur iPhone :\n\n1. Appuyez sur l'icône Partager (le petit carré avec flèche haut).\n2. Sélectionnez 'Sur l'écran d'accueil'.");
             };
         }
         if (pwaInstallDesc) {
             pwaInstallDesc.innerText = "Ajoutez à l'écran d'accueil via le menu Partager";
         }
-    } else {
-        // Android / Autres : On garde le bouton "Installer" par défaut
+    } else if (!isIOS()) {
+        // Sur Android, on n'affiche la bannière que si/quand on a le deferredPrompt 
+        // OU on peut l'afficher d'office mais sans le cacher si on clique.
+        if (pwaBanner) pwaBanner.classList.remove('hidden');
         if (btnPwaInstall) {
-            btnPwaInstall.innerText = "Installer";
+            btnPwaInstall.innerText = deferredPrompt ? "Installer" : "Vérification...";
         }
     }
 }
@@ -237,34 +233,63 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Function to trigger PWA install manually if needed
-function installPWAFromBanner() {
+async function installPWAFromBanner() {
+    console.log("Tentative d'installation. Statut du prompt :", !!deferredPrompt);
+    
     if (deferredPrompt) {
-        // Le vrai prompt Android
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then((choiceResult) => {
-            if (choiceResult.outcome === 'accepted') {
-                console.log('User accepted the PWA install');
+        try {
+            // Le vrai prompt Android
+            await deferredPrompt.prompt();
+            
+            // Attendre le choix de l'utilisateur
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log('Résultat de l\'installation :', outcome);
+            
+            if (outcome === 'accepted') {
+                console.log('Installation acceptée.');
+                if (pwaBanner) pwaBanner.classList.add('hidden');
             } else {
-                console.log('User dismissed the PWA install');
+                console.log('Installation refusée par l\'utilisateur.');
+                // On peut choisir de laisser la bannière ou de la cacher.
+                // Ici on la cache pour ne pas être trop intrusif après un refus.
+                if (pwaBanner) pwaBanner.classList.add('hidden');
             }
-            // Dans tous les cas, on cache la bannière et on reset le prompt
-            if (pwaBanner) pwaBanner.classList.add('hidden');
+            
+            // On reset le prompt dans tous les cas car il n'est plus utilisable
             deferredPrompt = null;
-        });
+        } catch (err) {
+            console.error("Erreur lors de l'appel au prompt PWA:", err);
+            // On ne cache pas la bannière en cas d'erreur technique
+        }
     } else {
-        // Fallback manuel si l'API est absente
         if (isIOS()) {
-            // Ne devrait pas arriver ici car on a changé le onclick pour iOS dans checkAndShowPWABanner
-            alert("Pour installer l'app sur iPhone :\n\n1. Appuyez sur l'icône Partager\n2. Sélectionnez 'Sur l'écran d'accueil'.");
+            // Déjà géré par l'onclick spécifique dans checkAndShowPWABanner
         } else {
-            // Sur Android, on évite l'alerte "mode d'emploi" qui agace l'utilisateur.
-            // Si on arrive ici, c'est que le prompt n'est pas prêt. 
-            // On cache la bannière en attendant qu'elle soit réactivée par l'event.
-            if (pwaBanner) pwaBanner.classList.add('hidden');
-            console.log("Installation native non disponible pour le moment.");
+            console.log("Le prompt d'installation n'est pas prêt.");
+            if (btnPwaInstall) {
+                const originalText = btnPwaInstall.innerText;
+                btnPwaInstall.innerText = "Patientez...";
+                btnPwaInstall.style.opacity = "0.7";
+                
+                setTimeout(() => {
+                    btnPwaInstall.innerText = originalText;
+                    btnPwaInstall.style.opacity = "1";
+                }, 3000);
+            }
+            
+            // On NE cache PAS la bannière. On explique pourquoi ça bloque.
+            alert("L'installation est en cours de préparation par votre navigateur. \n\nRéessayez dans quelques secondes quand le bouton redeviendra actif.");
+            console.warn("L'événement 'beforeinstallprompt' n'a pas encore été reçu.");
         }
     }
 }
+
+// Détecter quand l'application a été installée avec succès
+window.addEventListener('appinstalled', (evt) => {
+    console.log('L\'application OS List Manager a été installée !');
+    if (pwaBanner) pwaBanner.classList.add('hidden');
+    deferredPrompt = null;
+});
 
 
 // Map to store per-list filters
@@ -2833,7 +2858,7 @@ window.onload = function () {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then(registration => {
-            console.log('Service Worker Registered (v23)');
+            console.log('Service Worker Registered (v25)');
 
             registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
