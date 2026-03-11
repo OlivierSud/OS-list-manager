@@ -1,9 +1,9 @@
-const CACHE_NAME = 'os-list-v25';
+const CACHE_NAME = 'os-list-v26';
 const ASSETS = [
     './',
     './index.html',
     './css/style.css?v=6',
-    './js/app.js?v=20',
+    './js/app.js?v=21',
     './js/supabase-config.js',
     './manifest.json',
     './icone_ListManager.jpg',

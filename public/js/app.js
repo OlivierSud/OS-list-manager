@@ -201,11 +201,10 @@ function checkAndShowPWABanner() {
             pwaInstallDesc.innerText = "Ajoutez à l'écran d'accueil via le menu Partager";
         }
     } else if (!isIOS()) {
-        // Sur Android, on n'affiche la bannière que si/quand on a le deferredPrompt 
-        // OU on peut l'afficher d'office mais sans le cacher si on clique.
+        // Fallback Android: On affiche d'office car certains événements tardent.
         if (pwaBanner) pwaBanner.classList.remove('hidden');
         if (btnPwaInstall) {
-            btnPwaInstall.innerText = deferredPrompt ? "Installer" : "Vérification...";
+            btnPwaInstall.innerText = "Installer";
         }
     }
 }
@@ -2858,7 +2857,7 @@ window.onload = function () {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then(registration => {
-            console.log('Service Worker Registered (v25)');
+            console.log('Service Worker Registered (v26)');
 
             registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
