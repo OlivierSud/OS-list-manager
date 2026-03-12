@@ -155,9 +155,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Cache versions
-const JS_VERSION = "44";
+const JS_VERSION = "45";
 console.log(`App loaded (v${JS_VERSION})`);
-console.log(`Current Hash: ${window.location.hash ? '(Present)' : '(None)'}`);
+console.log(`Current Hash: ${window.location.hash ? '(Present: ' + window.location.hash.substring(0, 10) + '...)' : '(None)'}`);
 
 // Diagnostic Manifest
 fetch('manifest.json').then(r => {
@@ -2367,11 +2367,17 @@ window.onload = function () {
     // Initialize history state for in-app navigation
     // CRITICAL: Do not clear hash if it contains auth tokens!
     try {
-        const hasAuthHash = window.location.hash.includes('access_token=') || window.location.hash.includes('error=');
+        const hash = window.location.hash || "";
+        const hasAuthHash = hash.includes('access_token=') || 
+                            hash.includes('error=') || 
+                            hash.includes('type=recovery') ||
+                            hash.includes('type=signup') ||
+                            hash.includes('refresh_token=');
+                            
         if (!hasAuthHash) {
             history.replaceState({ app: 'oslist', view: 'home' }, '');
         } else {
-            console.log("Auth hash detected, preserving URL during init.");
+            console.log("Auth hash detected in URL, blocking history.replaceState to preserve tokens.");
         }
     } catch (e) { }
 
