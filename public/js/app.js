@@ -155,8 +155,10 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Cache versions
-const JS_VERSION = "45";
+// Cache versions
+const JS_VERSION = "47";
 console.log(`App loaded (v${JS_VERSION})`);
+
 console.log(`Current Hash: ${window.location.hash ? '(Present: ' + window.location.hash.substring(0, 10) + '...)' : '(None)'}`);
 
 // Diagnostic Manifest
@@ -215,6 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function checkPersistentAuth() {
+    console.log("Checking persistent auth...");
     if (!window.supabaseClient) {
         console.error("Erreur: supabaseClient n'est pas initialisé !");
         return;
@@ -225,12 +228,15 @@ async function checkPersistentAuth() {
         console.log("Auth event:", event, currentSession ? "User found" : "No user");
         
         if (currentSession && currentSession.user) {
+            const hasUserChanged = state.userEmail !== currentSession.user.email;
             state.userEmail = currentSession.user.email;
             state.userPicture = currentSession.user.user_metadata?.avatar_url || null;
             
             // Fetch data on login or session init
             if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
                 fetchSupabaseData();
+            } else if (hasUserChanged) {
+                renderHome();
             }
         } else if (event === 'SIGNED_OUT') {
             state.userEmail = null;
@@ -244,15 +250,19 @@ async function checkPersistentAuth() {
     // Check initial session
     try {
         const { data: { session }, error } = await supabaseClient.auth.getSession();
-        if (error) console.error("Session Retrieval Error:", error.message);
+        if (error) {
+            console.error("Session Retrieval Error:", error.message);
+            renderHome();
+            return;
+        }
         
         if (session && session.user) {
+            console.log("Session recovery success:", session.user.email);
             state.userEmail = session.user.email;
             state.userPicture = session.user.user_metadata?.avatar_url || null;
-            // No need to call fetchSupabaseData here if INITIAL_SESSION event fires immediately
-            // But for safety if event didn't fire yet:
-            if (state.lists.length === 0) fetchSupabaseData();
+            await fetchSupabaseData();
         } else {
+            console.log("No active session found.");
             renderHome();
         }
     } catch (e) {
@@ -260,6 +270,7 @@ async function checkPersistentAuth() {
         renderHome();
     }
 }
+
 
 async function handleLogout() {
     if (!window.supabaseClient) return;
@@ -2287,7 +2298,8 @@ function updateSoundIcon() {
 }
 
 // --- Init ---
-window.onload = function () {
+window.onload = async function () {
+
     // Initialize Theme
     const savedTheme = localStorage.getItem('theme') || 'dark';
     if (savedTheme === 'light') {
@@ -2308,9 +2320,10 @@ window.onload = function () {
     }
 
     // Supabase Auth Init
-    checkPersistentAuth();
-    renderHome();
+    await checkPersistentAuth();
+    // renderHome is called inside checkPersistentAuth or fetchSupabaseData
     initColorPicker();
+
 
     // Trigger page reveal animation
     if (app) {

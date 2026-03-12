@@ -29,7 +29,8 @@
   <!-- Early PWA Capture -->
   <script>
     window.deferredPrompt = null;
-    console.log('--- PWA DIAGNOSTIC v43 ---');
+    console.log('--- PWA DIAGNOSTIC v47 ---');
+
     console.log('Protocol:', window.location.protocol);
     console.log('Hostname:', window.location.hostname);
     
@@ -298,15 +299,6 @@
 
   </div>
 
-  <script src="js/supabase-config.js"></script>
-  <script src="js/app.js?v=45"></script>
-  <script>
-    // Initialize Lucide Icons after load
-    document.addEventListener("DOMContentLoaded", function () {
-      lucide.createIcons();
-    });
-  </script>
-
   <!-- PWA Install Banner (Global, Mobile Only) -->
   <div id="pwa-install-banner" class="hidden glass-panel"
     style="position: fixed !important; bottom: 2rem !important; left: 50% !important; transform: translateX(-50%) !important; z-index: 9999 !important; padding: 1rem; display: flex; align-items: center; justify-content: space-between; border: 0.6px solid var(--accent-color); width: 90%; max-width: 400px; text-align: left; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
@@ -320,6 +312,15 @@
     <button onclick="installPWAFromBanner()" id="btn-pwa-install" class="btn-send"
       style="width: auto; padding: 0.5rem 1rem; font-size: 0.8rem;">Installer</button>
   </div>
+
+  <script src="js/supabase-config.js"></script>
+  <script src="js/app.js?v=47"></script>
+  <script>
+    // Initialize Lucide Icons after load
+    document.addEventListener("DOMContentLoaded", function () {
+      lucide.createIcons();
+    });
+  </script>
 </body>
 
 </html>
