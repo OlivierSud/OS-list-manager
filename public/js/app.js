@@ -155,8 +155,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Cache versions
-const JS_VERSION = "43";
+const JS_VERSION = "44";
 console.log(`App loaded (v${JS_VERSION})`);
+console.log(`Current Hash: ${window.location.hash ? '(Present)' : '(None)'}`);
 
 // Diagnostic Manifest
 fetch('manifest.json').then(r => {
@@ -219,32 +220,19 @@ async function checkPersistentAuth() {
         return;
     }
 
-    try {
-        const { data: { session }, error } = await supabaseClient.auth.getSession();
-        if (error) console.error("Session Error:", error.message);
-
-        if (session && session.user) {
-            state.userEmail = session.user.email;
-            state.userPicture = session.user.user_metadata?.avatar_url || null;
-            console.log("Session init: User detected ->", state.userEmail);
-            fetchSupabaseData(); // fetch lists and calls renderHome
-        }
-    } catch (e) {
-        console.error("Session check error:", e);
-        alert("Erreur de session (" + e.message + "). Veuillez vider le cache.");
-    }
-
+    // Subscribe to auth changes
     supabaseClient.auth.onAuthStateChange((event, currentSession) => {
-        console.log("Auth event:", event);
-        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-            if (currentSession && currentSession.user) {
-                state.userEmail = currentSession.user.email;
-                state.userPicture = currentSession.user.user_metadata?.avatar_url || null;
-                console.log("State updated from auth change ->", state.userEmail);
+        console.log("Auth event:", event, currentSession ? "User found" : "No user");
+        
+        if (currentSession && currentSession.user) {
+            state.userEmail = currentSession.user.email;
+            state.userPicture = currentSession.user.user_metadata?.avatar_url || null;
+            
+            // Fetch data on login or session init
+            if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
                 fetchSupabaseData();
             }
         } else if (event === 'SIGNED_OUT') {
-            console.log("User signed out");
             state.userEmail = null;
             state.userPicture = null;
             state.lists = [];
@@ -252,6 +240,25 @@ async function checkPersistentAuth() {
             renderHome();
         }
     });
+
+    // Check initial session
+    try {
+        const { data: { session }, error } = await supabaseClient.auth.getSession();
+        if (error) console.error("Session Retrieval Error:", error.message);
+        
+        if (session && session.user) {
+            state.userEmail = session.user.email;
+            state.userPicture = session.user.user_metadata?.avatar_url || null;
+            // No need to call fetchSupabaseData here if INITIAL_SESSION event fires immediately
+            // But for safety if event didn't fire yet:
+            if (state.lists.length === 0) fetchSupabaseData();
+        } else {
+            renderHome();
+        }
+    } catch (e) {
+        console.error("Session check error (fatal):", e);
+        renderHome();
+    }
 }
 
 async function handleLogout() {
@@ -2358,8 +2365,14 @@ window.onload = function () {
     });
 
     // Initialize history state for in-app navigation
+    // CRITICAL: Do not clear hash if it contains auth tokens!
     try {
-        history.replaceState({ app: 'oslist', view: 'home' }, '');
+        const hasAuthHash = window.location.hash.includes('access_token=') || window.location.hash.includes('error=');
+        if (!hasAuthHash) {
+            history.replaceState({ app: 'oslist', view: 'home' }, '');
+        } else {
+            console.log("Auth hash detected, preserving URL during init.");
+        }
     } catch (e) { }
 
     window.addEventListener('popstate', (e) => {
