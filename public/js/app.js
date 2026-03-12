@@ -155,7 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Cache versions
-const JS_VERSION = "37";
+const JS_VERSION = "43";
 console.log(`App loaded (v${JS_VERSION})`);
 
 // Diagnostic Manifest
@@ -212,6 +212,57 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("Événement de connexion attaché au bouton.");
     }
 });
+
+async function checkPersistentAuth() {
+    if (!window.supabaseClient) {
+        console.error("Erreur: supabaseClient n'est pas initialisé !");
+        return;
+    }
+
+    try {
+        const { data: { session }, error } = await supabaseClient.auth.getSession();
+        if (error) console.error("Session Error:", error.message);
+
+        if (session && session.user) {
+            state.userEmail = session.user.email;
+            state.userPicture = session.user.user_metadata?.avatar_url || null;
+            console.log("Session init: User detected ->", state.userEmail);
+            fetchSupabaseData(); // fetch lists and calls renderHome
+        }
+    } catch (e) {
+        console.error("Session check error:", e);
+        alert("Erreur de session (" + e.message + "). Veuillez vider le cache.");
+    }
+
+    supabaseClient.auth.onAuthStateChange((event, currentSession) => {
+        console.log("Auth event:", event);
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            if (currentSession && currentSession.user) {
+                state.userEmail = currentSession.user.email;
+                state.userPicture = currentSession.user.user_metadata?.avatar_url || null;
+                console.log("State updated from auth change ->", state.userEmail);
+                fetchSupabaseData();
+            }
+        } else if (event === 'SIGNED_OUT') {
+            console.log("User signed out");
+            state.userEmail = null;
+            state.userPicture = null;
+            state.lists = [];
+            state.items = {};
+            renderHome();
+        }
+    });
+}
+
+async function handleLogout() {
+    if (!window.supabaseClient) return;
+    try {
+        await supabaseClient.auth.signOut();
+        goHome();
+    } catch (e) {
+        console.error("Logout error", e);
+    }
+}
 
 // Supabase Logic
 async function fetchSupabaseData() {
@@ -334,10 +385,11 @@ async function fetchSupabaseData() {
             list.items = listItems.filter(i => !i.isHeader).length;
         });
 
-        renderHome();
         console.log("Supabase sync complete:", state);
     } catch (e) {
         console.error("Supabase Data Error:", e);
+    } finally {
+        renderHome();
     }
 }
 
@@ -903,11 +955,6 @@ function renderHome() {
         headerControlsRow.style.display = 'none';
     }
 
-    // Show PWA banner if available
-    if (deferredPrompt && pwaBanner) {
-        pwaBanner.classList.remove('hidden');
-    }
-
     headerTitle.innerText = "Mes Listes";
 
     // Clear and rebuild content
@@ -1330,11 +1377,12 @@ async function refreshApp() {
         try { location.reload(); } catch (err) { }
     }
 }
+window.refreshApp = refreshApp;
 
 // Push history state when navigating within the app so browser back stays inside the app
 function pushAppState(stateObj) {
     try {
-        history.pushState(stateObj, '', '');
+        history.pushState(stateObj, '');
     } catch (e) {
         // ignore
     }
@@ -2311,15 +2359,17 @@ window.onload = function () {
 
     // Initialize history state for in-app navigation
     try {
-        history.replaceState({ app: 'oslist', view: 'home' }, '', '');
+        history.replaceState({ app: 'oslist', view: 'home' }, '');
     } catch (e) { }
 
     window.addEventListener('popstate', (e) => {
         const s = e.state;
         if (!s || s.app !== 'oslist') {
-            // If popstate is not ours, force app to home and push an app state to keep user inside
-            goHome();
-            try { history.pushState({ app: 'oslist', view: 'home' }, '', ''); } catch (err) { }
+            // If popstate is not ours, just ignore it on load to preserve auth hash!
+            if (state.userEmail) {
+                goHome();
+                try { history.pushState({ app: 'oslist', view: 'home' }, ''); } catch (err) { }
+            }
             return;
         }
 

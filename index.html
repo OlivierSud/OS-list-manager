@@ -29,7 +29,7 @@
   <!-- Early PWA Capture -->
   <script>
     window.deferredPrompt = null;
-    console.log('--- PWA DIAGNOSTIC v37 ---');
+    console.log('--- PWA DIAGNOSTIC v43 ---');
     console.log('Protocol:', window.location.protocol);
     console.log('Hostname:', window.location.hostname);
     
@@ -53,26 +53,16 @@
 
   <div id="login-container"
     style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; padding: 2rem; text-align: center;">
-    
-    <!-- PWA Install Banner (Mobile Only) -->
-    <div id="pwa-install-banner" class="hidden glass-panel"
-      style="margin-bottom: 2rem; padding: 1rem; display: flex; align-items: center; justify-content: space-between; border: 0.6px solid var(--accent-color); width: 100%; max-width: 400px; text-align: left;">
-      <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <i data-lucide="download" style="color: var(--accent-color); width: 24px; height: 24px;"></i>
-        <div>
-          <div style="font-weight: 600; font-size: 0.9rem;">Installer l'application</div>
-          <div id="pwa-install-desc" style="font-size: 0.75rem; color: var(--text-secondary);">Accès rapide depuis l'écran d'accueil</div>
-        </div>
-      </div>
-      <button onclick="installPWAFromBanner()" id="btn-pwa-install" class="btn-send"
-        style="width: auto; padding: 0.5rem 1rem; font-size: 0.8rem;">Installer</button>
-    </div>
 
     <h1 style="color: var(--accent-color); margin-bottom: 2rem;">OS List Manager</h1>
     <p style="margin-bottom: 2rem; color: var(--text-secondary);">Connectez-vous pour gérer vos listes.</p>
     <button id="login-button" class="btn-send"
       style="width: auto; padding: 1rem 2rem; border-radius: 2rem; gap: 0.5rem;">
       <i data-lucide="log-in"></i> Se connecter avec Google
+    </button>
+    <button onclick="window.refreshApp && window.refreshApp()" class="btn-icon" 
+      style="margin-top: 2rem; font-size: 0.8rem; color: var(--text-secondary); text-decoration: underline;">
+      <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i> Problème de connexion ? Vider le cache
     </button>
   </div>
 
@@ -309,13 +299,27 @@
   </div>
 
   <script src="js/supabase-config.js"></script>
-  <script src="js/app.js?v=37"></script>
+  <script src="js/app.js?v=43"></script>
   <script>
     // Initialize Lucide Icons after load
     document.addEventListener("DOMContentLoaded", function () {
       lucide.createIcons();
     });
   </script>
+
+  <!-- PWA Install Banner (Global, Mobile Only) -->
+  <div id="pwa-install-banner" class="hidden glass-panel"
+    style="position: fixed !important; bottom: 2rem !important; left: 50% !important; transform: translateX(-50%) !important; z-index: 9999 !important; padding: 1rem; display: flex; align-items: center; justify-content: space-between; border: 0.6px solid var(--accent-color); width: 90%; max-width: 400px; text-align: left; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
+      <i data-lucide="download" style="color: var(--accent-color); width: 24px; height: 24px;"></i>
+      <div>
+        <div style="font-weight: 600; font-size: 0.9rem;">Installer l'application</div>
+        <div id="pwa-install-desc" style="font-size: 0.75rem; color: var(--text-secondary);">Accès rapide depuis l'écran d'accueil</div>
+      </div>
+    </div>
+    <button onclick="installPWAFromBanner()" id="btn-pwa-install" class="btn-send"
+      style="width: auto; padding: 0.5rem 1rem; font-size: 0.8rem;">Installer</button>
+  </div>
 </body>
 
 </html>
