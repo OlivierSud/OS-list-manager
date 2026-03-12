@@ -1,9 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --bg-primary: #0f172a; /* Slate 900 - Dark mode base */
-  --bg-secondary: #1e293b; /* Slate 800 */
-  --bg-glass: rgba(30, 41, 59, 0.7); /* Glassmorphism base */
+  --bg-primary: #020617; /* Deepest blue/slate */
+  --bg-secondary: #0f172a; /* Slate 900 */
+  --bg-glass: rgba(15, 23, 42, 0.7); /* Deep glass base */
   
   --text-primary: #f8fafc; /* Slate 50 */
   --text-secondary: #94a3b8; /* Slate 400 */
@@ -41,7 +41,9 @@ body {
   min-width: 320px;
   min-height: 100vh;
   justify-content: center; /* Center app */
-  background: radial-gradient(circle at top right, #1e1b4b, var(--bg-primary)); /* Subtle gradient */
+  /* Dégradé inspiré de l'icône : bleu nuit profond vers bleu un peu plus clair au centre */
+  background: radial-gradient(circle at center, #070e27 0%, var(--bg-primary) 100%);
+  background-attachment: fixed;
 }
 
 #root {
