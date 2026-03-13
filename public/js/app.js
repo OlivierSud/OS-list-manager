@@ -37,13 +37,6 @@ const headerTitleRow = document.getElementById('header-title-row');
 const btnCheckAll = document.getElementById('btn-check-all');
 const btnUncheckAll = document.getElementById('btn-uncheck-all');
 const listActionsRow = document.getElementById('list-actions-row');
-const shareManageModal = document.getElementById('share-manage-modal');
-const shareModalOwner = document.getElementById('share-modal-owner');
-const addCollaboratorSection = document.getElementById('add-collaborator-section');
-const btnShareModalAdd = document.getElementById('btn-share-modal-add');
-const shareModalInput = document.getElementById('share-modal-input');
-const collaboratorsList = document.getElementById('collaborators-list');
-const btnShareModalClose = document.getElementById('btn-share-modal-close');
 
 // User Profile Elements
 const userProfileContainer = document.getElementById('user-profile-container');
@@ -56,135 +49,98 @@ const themeCheckbox = document.getElementById('theme-checkbox');
 const soundToggle = document.getElementById('sound-toggle');
 const soundIcon = document.getElementById('sound-icon');
 
-const pwaBanner = document.getElementById('pwa-install-banner');
-const btnPwaInstall = document.getElementById('btn-pwa-install');
-const pwaInstallDesc = document.getElementById('pwa-install-desc');
-
-// --- Global Variables (Drag & Drop, State, Global Config) ---
-const LONG_PRESS_MS = 500;
+let currentListId = null;
+let currentListName = "";
+let collapsedSections = new Set(); // Track collapsed section indices
 let draggedElement = null;
 let draggedIndex = null;
+const LONG_PRESS_MS = 280;
 let touchDragging = false;
 let touchStartX = 0, touchStartY = 0;
 let touchLastX = 0, touchLastY = 0;
-let touchGhost = null;
+
+// Share Management Elements
+const shareManageModal = document.getElementById('share-manage-modal');
+const shareModalOwner = document.getElementById('share-modal-owner');
+const collaboratorsList = document.getElementById('collaborators-list');
+const btnShareModalClose = document.getElementById('btn-share-modal-close');
+const addCollaboratorSection = document.getElementById('add-collaborator-section');
+const shareModalInput = document.getElementById('share-modal-input');
+const btnShareModalAdd = document.getElementById('btn-share-modal-add');
+let touchGhost = null; // visual floating clone
 let touchLongPressTimer = null;
-let _blankDragImage = null; // Used to hide native drag ghost on desktop
-let currentListId = null;
-let currentListName = "";
 
-// State
-let state = {
-    view: 'home',
-    activeListId: null,
-    lists: [],
-    items: {},
-    selectedSectionId: null,
-    isHeaderMode: false,
-    filter: 'all',
-    searchQuery: '',
-    userEmail: null,
-    userPicture: null,
-    completedLists: new Set(),
-    collapsedSections: new Set(), // Store key as "listId-itemId"
-    soundEnabled: true,
-    shares: []
+// Drag / Auto-scroll configuration (adjust these values to tune behavior)
+// You can change them directly in code or at runtime via `window.DRAG_CONFIG`.
+// By default we use a ratio of the container height for activation (e.g. 0.25 = 1/4 of screen).
+const DRAG_CONFIG = {
+    // If set to a number between 0 and 1, uses this fraction of the container height.
+    AUTO_SCROLL_THRESHOLD_RATIO: 0.25,
+    // Backwards-compatible pixel fallback (if ratio is null):
+    AUTO_SCROLL_THRESHOLD: null,
+    AUTO_SCROLL_STEP: 24 // px per tick
 };
+window.DRAG_CONFIG = DRAG_CONFIG;
 
-// --- PWA LOGIC ---
-window.deferredPrompt = window.deferredPrompt || null;
+// Minimal transparent image used to suppress the browser's native drag image
+const _blankDragImage = (() => {
+    try {
+        const img = new Image();
+        img.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEUAAACnej3aAAAAAXRSTlMAQObYZgAAAApJREFUCNdjYAAAAAIAAeIhvDMAAAAASUVORK5CYII=';
+        return img;
+    } catch (e) { return null; }
+})();
 
-const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
-const isSafari = () => /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+let autoScrollInterval = null;
+let autoScrollDirection = 0;
 
-function checkAndShowPWABanner() {
-    console.log("Checking PWA Banner... standalone:", isStandalone(), "prompt:", !!window.deferredPrompt);
-    if (isStandalone()) {
-        if (pwaBanner) pwaBanner.classList.add('hidden');
-        return;
-    }
-
-    if (pwaBanner) pwaBanner.classList.remove('hidden');
-    updatePWAButtonState();
-
-    if (isIOS()) {
-        if (btnPwaInstall) {
-            btnPwaInstall.innerText = "Comment ?";
-            btnPwaInstall.onclick = (e) => {
-                e.preventDefault();
-                installPWAFromBanner();
-            };
-        }
-    }
-}
-
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    window.deferredPrompt = e;
-    console.log('✅ PWA ready to install');
-    if (btnPwaInstall) btnPwaInstall.innerText = "Installer";
-});
-
-function updatePWAButtonState() {
-    if (!btnPwaInstall) return;
-    if (window.deferredPrompt) {
-        btnPwaInstall.innerText = "Installer";
-        btnPwaInstall.style.background = "var(--accent-color)";
-        btnPwaInstall.style.color = "white";
-    } else if (!isIOS()) {
-        btnPwaInstall.innerText = "Vérification...";
-    }
-}
-window.updatePWAButtonState = updatePWAButtonState;
-
-async function installPWAFromBanner() {
-    if (window.deferredPrompt) {
+function startAutoScroll(container, direction) {
+    if (!container) return;
+    if (autoScrollInterval && autoScrollDirection === direction) return;
+    stopAutoScroll();
+    autoScrollDirection = direction;
+    const step = (window.DRAG_CONFIG && window.DRAG_CONFIG.AUTO_SCROLL_STEP) || DRAG_CONFIG.AUTO_SCROLL_STEP;
+    autoScrollInterval = setInterval(() => {
         try {
-            console.log("Triggering PWA Install prompt...");
-            await window.deferredPrompt.prompt();
-            const { outcome } = await window.deferredPrompt.userChoice;
-            console.log(`PWA install user choice: ${outcome}`);
-            if (outcome === 'accepted') {
-                if (pwaBanner) pwaBanner.classList.add('hidden');
-                window.deferredPrompt = null;
-            }
-        } catch (err) {
-            console.error("Installation error:", err);
-            alert("Erreur lors de l'installation : " + err.message);
+            container.scrollBy({ top: direction * step, left: 0, behavior: 'auto' });
+        } catch (e) {
+            // fallback
+            container.scrollTop += direction * step;
         }
-    } else {
-        if (isIOS()) {
-            alert("Installation iPhone :\n\n1. Appuyez sur Partager (□↑)\n2. Sélectionnez 'Sur l'écran d'accueil'.");
-        } else {
-            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            const isInsecure = window.location.protocol !== 'https:' && !isLocal;
-            
-            if (isInsecure) {
-                alert("Installation bloquée : PWA nécessite une connexion sécurisée (HTTPS).\n\nVeuillez utiliser l'adresse sécurisée de votre site.");
-            } else {
-                alert("Le navigateur n'a pas encore validé l'installation (Événement 'beforeinstallprompt' non reçu).\n\nCauses possibles :\n- Application déjà installée\n- Navigation privée (Incognito)\n- Connexion trop lente (Service Worker en chargement)\n- Manifest non reconnu");
-            }
-        }
+    }, 50);
+}
+
+function stopAutoScroll() {
+    if (autoScrollInterval) {
+        clearInterval(autoScrollInterval);
+        autoScrollInterval = null;
+        autoScrollDirection = 0;
     }
 }
-window.installPWAFromBanner = installPWAFromBanner;
 
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(checkAndShowPWABanner, 500);
-});
+function handleAutoScrollDuringDrag(e) {
+    if (!tasksContainer) return;
+    const rect = tasksContainer.getBoundingClientRect();
+    const y = e.clientY;
+    // Determine threshold: prefer ratio-based threshold (fraction of container height).
+    const cfg = window.DRAG_CONFIG || DRAG_CONFIG;
+    let threshold = null;
+    if (typeof cfg.AUTO_SCROLL_THRESHOLD_RATIO === 'number' && cfg.AUTO_SCROLL_THRESHOLD_RATIO > 0 && cfg.AUTO_SCROLL_THRESHOLD_RATIO < 1) {
+        threshold = rect.height * cfg.AUTO_SCROLL_THRESHOLD_RATIO;
+    } else if (typeof cfg.AUTO_SCROLL_THRESHOLD === 'number') {
+        threshold = cfg.AUTO_SCROLL_THRESHOLD;
+    } else {
+        threshold = rect.height * 0.25; // default to 25% if nothing set
+    }
 
-// Cache versions
-// Cache versions
-const JS_VERSION = "56";
-console.log(`App loaded (v${JS_VERSION})`);
-
-console.log(`Current Hash: ${window.location.hash ? '(Present: ' + window.location.hash.substring(0, 10) + '...)' : '(None)'}`);
-
-// Diagnostic Manifest
-fetch('manifest.json').then(r => {
-    console.log(`Manifest check: status=${r.status}, type=${r.headers.get('content-type')}`);
-}).catch(e => console.error('Manifest fetch failed:', e));
+    if (y < rect.top + threshold) {
+        startAutoScroll(tasksContainer, -1);
+    } else if (y > rect.bottom - threshold) {
+        startAutoScroll(tasksContainer, 1);
+    } else {
+        stopAutoScroll();
+    }
+}
 
 // Color palette for lists
 const COLOR_PALETTE = [
@@ -201,6 +157,110 @@ const COLOR_PALETTE = [
     '#6366f1', // Indigo
     '#14b8a6'  // Teal
 ];
+
+// State
+let state = {
+    view: 'home', // 'home' | 'list'
+    activeListId: null,
+    lists: [],
+    items: {},
+    selectedSectionId: null, // Track currently selected section
+    isHeaderMode: false,
+    filter: 'all',
+    searchQuery: '',
+    userEmail: null,
+    userPicture: null,
+    completedLists: new Set(), // Track which lists have triggered confetti
+    soundEnabled: true,
+    shares: [] // For sharing
+};
+
+// PWA Install Prompt
+let deferredPrompt;
+const pwaBanner = document.getElementById('pwa-install-banner');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    console.log('PWA persistent prompt ready');
+
+    // Show banner only if we are in Home view AND not already installed
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    if (state.view === 'home' && !isStandalone) {
+        if (pwaBanner) pwaBanner.classList.remove('hidden');
+    }
+});
+
+// Function to trigger PWA install manually if needed
+function installPWAFromBanner() {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+            if (choiceResult.outcome === 'accepted') {
+                console.log('User accepted the PWA install');
+                if (pwaBanner) pwaBanner.classList.add('hidden');
+            }
+            deferredPrompt = null;
+        });
+    }
+}
+
+
+// Map to store per-list filters
+let listFilters = {};
+
+
+// --- Utilities ---
+function generateId() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    return Math.random().toString(36).substring(2) + Date.now().toString(36);
+}
+
+// Audio Manager
+const sounds = {
+    check: new Audio('./sounds/check.mp3'),
+    finished: new Audio('./sounds/finished.mp3'),
+    remove: new Audio('./sounds/remove.mp3'),
+    add: new Audio('./sounds/add.mp3'),
+    refresh: new Audio('./sounds/refresh.mp3')
+};
+
+function playSound(name) {
+    if (state.soundEnabled && sounds[name]) {
+        sounds[name].currentTime = 0;
+        sounds[name].play().catch(e => console.log('Sound play blocked:', e));
+    }
+}
+
+// --- Supabase Auth Integration ---
+let userSession = null;
+
+async function checkPersistentAuth() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) {
+        userSession = session;
+        state.userEmail = session.user.email;
+        state.userPicture = session.user.user_metadata.avatar_url;
+        console.log("Restored Supabase session:", state.userEmail);
+        fetchSupabaseData();
+        renderHome();
+    }
+}
+
+async function handleLogout() {
+    const { error } = await supabaseClient.auth.signOut();
+    if (error) console.error("Error signing out:", error);
+
+    userSession = null;
+    state.userEmail = null;
+    state.userPicture = null;
+
+    goHome();
+    closeOptions();
+}
+window.handleLogout = handleLogout;
 
 async function handleAuthClick() {
     console.log("Tentative de connexion cliquée...");
@@ -236,99 +296,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-async function checkPersistentAuth() {
-    console.log("--- AUTH CHECK START ---");
-    if (!window.supabaseClient) {
-        console.error("❌ Erreur: supabaseClient n'est pas initialisé !");
-        return;
-    }
-
-    let isFetching = false;
-
-    // 1. Subscribe to auth changes
-    supabaseClient.auth.onAuthStateChange(async (event, currentSession) => {
-        console.log("🔔 Auth event:", event, currentSession ? `User found: ${currentSession.user.email}` : "No user");
-        
-        if (currentSession && currentSession.user) {
-            const hasUserChanged = state.userEmail !== currentSession.user.email;
-            state.userEmail = currentSession.user.email;
-            state.userPicture = currentSession.user.user_metadata?.avatar_url || null;
-            
-            // Only fetch if not already fetching or if user changed
-            if (!isFetching) {
-                if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
-                    isFetching = true;
-                    await fetchSupabaseData();
-                    isFetching = false;
-                } else if (hasUserChanged) {
-                    renderHome();
-                }
-            }
-        } else if (event === 'SIGNED_OUT') {
-            console.log("🚪 User signed out");
-            state.userEmail = null;
-            state.userPicture = null;
-            state.lists = [];
-            state.items = {};
-            renderHome();
-        }
-    });
-
-    // 2. Initial check for existing session
-    try {
-        console.log("🔍 Fetching current session...");
-        const { data: { session }, error } = await supabaseClient.auth.getSession();
-        
-        if (error) {
-            console.error("❌ Session Retrieval Error:", error.message);
-            renderHome();
-            return;
-        }
-        
-        if (session && session.user) {
-            console.log("✅ Session recovery success:", session.user.email);
-            state.userEmail = session.user.email;
-            state.userPicture = session.user.user_metadata?.avatar_url || null;
-            
-            if (!isFetching) {
-                isFetching = true;
-                await fetchSupabaseData();
-                isFetching = false;
-            }
-        } else {
-            // No session found.
-            // Check if we have a hash - if so, Supabase might still be processing it (async)
-            const hasHash = window.location.hash && (
-                window.location.hash.includes('access_token=') || 
-                window.location.hash.includes('error=')
-            );
-            
-            if (hasHash) {
-                console.log("⏳ Auth hash detected, waiting for onAuthStateChange...");
-                // Don't render home yet, wait for the event listener above to catch it
-            } else {
-                console.log("ℹ️ No active session and no auth hash. Showing login.");
-                renderHome();
-            }
-        }
-    } catch (e) {
-        console.error("❌ Session check error (fatal):", e);
-        renderHome();
-    }
-}
-
-
-async function handleLogout() {
-    if (!window.supabaseClient) return;
-    try {
-        await supabaseClient.auth.signOut();
-        goHome();
-    } catch (e) {
-        console.error("Logout error", e);
-    }
-}
-
-// Supabase Logic
 async function fetchSupabaseData() {
     if (!state.userEmail) return;
 
@@ -430,9 +397,8 @@ async function fetchSupabaseData() {
 
         state.items = {};
         tasks.forEach(task => {
-            const lid = String(task.list_id);
-            if (!state.items[lid]) state.items[lid] = [];
-            state.items[lid].push({
+            if (!state.items[task.list_id]) state.items[task.list_id] = [];
+            state.items[task.list_id].push({
                 id: task.id,
                 text: task.text,
                 done: task.done,
@@ -444,19 +410,16 @@ async function fetchSupabaseData() {
             });
         });
 
-        console.log("[fetchSupabaseData] Items distribution:", Object.keys(state.items).map(k => `${k}: ${state.items[k].length} items`));
-
         // Update item count for lists (exclude headers)
         state.lists.forEach(list => {
-            const listItems = state.items[String(list.id)] || [];
+            const listItems = state.items[list.id] || [];
             list.items = listItems.filter(i => !i.isHeader).length;
         });
 
+        renderHome();
         console.log("Supabase sync complete:", state);
     } catch (e) {
         console.error("Supabase Data Error:", e);
-    } finally {
-        renderHome();
     }
 }
 
@@ -637,7 +600,7 @@ window.leaveList = leaveList;
 
 async function syncOrderToSheet(listId) {
     if (!state.userEmail) return;
-    const items = state.items[String(listId)] || [];
+    const items = state.items[listId] || [];
 
     const tasksToUpsert = items.map((item, index) => ({
         id: (item.id && item.id.toString().length > 10) ? item.id : undefined,
@@ -732,7 +695,7 @@ async function duplicateListInSupabase(listId) {
         if (listError) throw listError;
 
         // 2. Clone tasks
-        const tasks = state.items[String(listId)] || [];
+        const tasks = state.items[listId] || [];
         const tasksToInsert = tasks.map((t, idx) => ({
             list_id: newList[0].id,
             text: t.text,
@@ -1022,6 +985,11 @@ function renderHome() {
         headerControlsRow.style.display = 'none';
     }
 
+    // Show PWA banner if available
+    if (deferredPrompt && pwaBanner) {
+        pwaBanner.classList.remove('hidden');
+    }
+
     headerTitle.innerText = "Mes Listes";
 
     // Clear and rebuild content
@@ -1032,7 +1000,7 @@ function renderHome() {
     }
 
     state.lists.forEach(list => {
-        const listItems = state.items[String(list.id)] || [];
+        const listItems = state.items[list.id] || [];
         const itemCount = listItems.filter(i => !i.isHeader).length;
 
         const el = document.createElement('div');
@@ -1063,11 +1031,8 @@ function renderHome() {
 }
 
 function renderList(listId) {
-    const list = state.lists.find(l => String(l.id) === String(listId));
-    if (!list) {
-        console.warn(`[renderList] List not found for ID: ${listId}`);
-        return;
-    }
+    const list = state.lists.find(l => l.id === listId);
+    if (!list) return;
 
     // Hide/Show elements
     listsContainer.classList.add('hidden');
@@ -1116,12 +1081,7 @@ function renderList(listId) {
     // Clear and rebuild content
     tasksContainer.innerHTML = '';
 
-    const currentItems = state.items[String(listId)] || [];
-    console.log(`[renderList] Rendering listId: ${listId} (Type: ${typeof listId})`);
-    console.log(`[renderList] Items found: ${currentItems.length}`);
-    if (currentItems.length === 0) {
-        console.log("[renderList] state.items keys:", Object.keys(state.items));
-    }
+    const currentItems = state.items[listId] || [];
 
     // --- Completion Progress Bar (header) ---
     updateHeaderProgress(currentItems);
@@ -1180,18 +1140,15 @@ function renderList(listId) {
 
             if (item.isHeader) {
                 const isSub = item.isSubHeader;
-                const collapseKey = `${state.activeListId}-${item.id}`;
-                sectionCollapsed = state.collapsedSections.has(collapseKey);
+                sectionCollapsed = collapsedSections.has(index);
 
                 // Check if ANY parent section is collapsed
                 if (item.parentId) {
                     let currentPid = item.parentId;
                     while (currentPid) {
-                        const ancestor = currentItems.find(i => i.isHeader && String(i.id) === String(currentPid));
+                        const ancestor = currentItems.find(i => i.isHeader && i.id === currentPid);
                         if (!ancestor) break;
-                        const ancestorIndex = currentItems.indexOf(ancestor);
-                        const ancestorKey = `${state.activeListId}-${ancestor.id}`;
-                        if (state.collapsedSections.has(ancestorKey)) return; // Hidden by ancestor collapse
+                        if (collapsedSections.has(currentItems.indexOf(ancestor))) return; // Hidden by ancestor collapse
                         currentPid = ancestor.parentId;
                     }
                 }
@@ -1257,7 +1214,7 @@ function renderList(listId) {
                 // Effective color: item color OR parent color if null
                 let effectiveColor = item.color;
                 if (!effectiveColor && item.parentId) {
-                    const parentHeader = currentItems.find(i => i.isHeader && String(i.id) === String(item.parentId));
+                    const parentHeader = currentItems.find(i => i.isHeader && i.id === item.parentId);
                     if (parentHeader) effectiveColor = parentHeader.color;
                 }
 
@@ -1344,11 +1301,9 @@ function renderList(listId) {
                 if (item.parentId) {
                     let currentPid = item.parentId;
                     while (currentPid) {
-                        const ancestor = currentItems.find(i => i.isHeader && String(i.id) === String(currentPid));
+                        const ancestor = currentItems.find(i => i.isHeader && i.id === currentPid);
                         if (!ancestor) break;
-                        const ancestorIndex = currentItems.indexOf(ancestor);
-                        const ancestorKey = `${state.activeListId}-${ancestor.id}`;
-                        if (state.collapsedSections.has(ancestorKey)) return; // Hidden by ancestor
+                        if (collapsedSections.has(currentItems.indexOf(ancestor))) return; // Hidden by ancestor
                         currentPid = ancestor.parentId;
                     }
                 }
@@ -1358,7 +1313,7 @@ function renderList(listId) {
                 if (item.parentId) {
                     el.classList.add('in-section');
                     // Check if parent header is a sub-header
-                    const parentHeader = currentItems.find(i => i.isHeader && String(i.id) === String(item.parentId));
+                    const parentHeader = currentItems.find(i => i.isHeader && i.id === item.parentId);
                     if (parentHeader) {
                         if (parentHeader.isSubHeader) el.classList.add('in-sub-section');
                         if (parentHeader.color) parentColor = parentHeader.color;
@@ -1371,9 +1326,9 @@ function renderList(listId) {
                     el.style.borderLeftColor = parentColor;
                 } else if (item.parentId) {
                     // Check grandparent color if parent is a subheader without color
-                    const parentHeader = currentItems.find(i => i.isHeader && String(i.id) === String(item.parentId));
+                    const parentHeader = currentItems.find(i => i.isHeader && i.id === item.parentId);
                     if (parentHeader && parentHeader.parentId) {
-                        const grandParent = currentItems.find(i => i.isHeader && String(i.id) === String(parentHeader.parentId));
+                        const grandParent = currentItems.find(i => i.isHeader && i.id === parentHeader.parentId);
                         if (grandParent && grandParent.color) {
                             el.style.backgroundColor = `${grandParent.color}10`;
                             el.style.borderLeftColor = grandParent.color;
@@ -1389,7 +1344,7 @@ function renderList(listId) {
 
                 el.innerHTML = `
                     <span class="drag-handle"></span>
-                    <div class="task-checkbox" onclick="event.stopPropagation(); window.toggleItem('${item.id}')">
+                    <div class="task-checkbox" onclick="event.stopPropagation(); toggleItem('${item.id}')">
                         ${checkIcon}
                     </div>
                     <span class="item-text" style="flex: 1" onclick="event.stopPropagation(); startInlineEdit(this, ${index})">${item.text}</span>
@@ -1422,8 +1377,6 @@ function openList(id) {
     state.activeListId = id;
     state.view = 'list';
     state.selectedSectionId = null; // Reset selection on list change
-    state.searchQuery = ''; // Reset search when switching lists
-    if (searchInput) searchInput.value = '';
     renderList(id);
     // push history state for this list view
     pushAppState({ app: 'oslist', view: 'list', id: id });
@@ -1459,12 +1412,11 @@ async function refreshApp() {
         try { location.reload(); } catch (err) { }
     }
 }
-window.refreshApp = refreshApp;
 
 // Push history state when navigating within the app so browser back stays inside the app
 function pushAppState(stateObj) {
     try {
-        history.pushState(stateObj, '');
+        history.pushState(stateObj, '', '');
     } catch (e) {
         // ignore
     }
@@ -1474,7 +1426,7 @@ function deleteListItem(index, e) {
     const listId = state.activeListId;
     if (!listId && listId !== 0) return;
 
-    const items = state.items[String(listId)];
+    const items = state.items[listId];
     if (!items || !items[index]) return;
 
     // Center of explosion from event if available, otherwise fallback to bounding rect
@@ -1502,7 +1454,7 @@ function deleteListItem(index, e) {
         // Delay real deletion to show animation
         setTimeout(() => {
             // Recheck items in case state changed
-            const freshItems = state.items[String(listId)];
+            const freshItems = state.items[listId];
             if (freshItems && freshItems[index]) {
                 const itemIdToDelete = freshItems[index].id;
                 freshItems.splice(index, 1);
@@ -1573,7 +1525,7 @@ function startInlineEdit(element, index) {
         const newText = input.value.trim();
         if (newText && newText !== originalText) {
             const listId = state.activeListId;
-            state.items[String(listId)][index].text = newText;
+            state.items[listId][index].text = newText;
             syncOrderToSheet(listId);
         }
         renderList(state.activeListId);
@@ -1608,32 +1560,18 @@ function goHome() {
 
 function toggleItem(itemId) {
     const listId = state.activeListId;
-    console.log(`[toggleItem] Attempting to toggle itemId: ${itemId} in listId: ${listId}`);
-    const items = state.items[String(listId)];
-    if (!items) {
-        console.error(`[toggleItem] No items found for listId: ${listId}`);
-        return;
-    }
-    const item = items.find(i => String(i.id) === String(itemId));
+    const items = state.items[listId];
+    const item = items.find(i => i.id === itemId);
 
     if (item) {
-        console.log(`[toggleItem] Item found: "${item.text}", current state: ${item.done} (Type: ${typeof item.done})`);
-        
-        // Convert to strict boolean before flipping
-        const isCurrentlyDone = (item.done === true || item.done === 'true' || item.done === 'TRUE');
-        item.done = !isCurrentlyDone;
-        
-        console.log(`[toggleItem] New strict boolean state: ${item.done}`);
+        item.done = !item.done;
         if (item.done) playSound('check');
         renderList(listId); // Re-render to update UI
 
         // Sync with Cloud
         syncOrderToSheet(listId);
-    } else {
-        console.warn(`[toggleItem] Item NOT found for itemId: ${itemId}. Available item IDs:`, items.map(i => i.id));
     }
 }
-window.toggleItem = toggleItem;
 
 function addItem() {
     const text = newTaskInput.value.trim();
@@ -1644,7 +1582,7 @@ function addItem() {
 
     let parentId = null;
     let isStandalone = true;
-    const items = state.items[String(listId)] || [];
+    const items = state.items[listId] || [];
 
     if (!isHeader) {
         if (state.selectedSectionId) {
@@ -1669,7 +1607,7 @@ function addItem() {
         lastModifier: state.userEmail
     };
 
-    if (!state.items[String(listId)]) state.items[String(listId)] = [];
+    if (!state.items[listId]) state.items[listId] = [];
 
     // Insertion Logic — always use syncOrderToSheet to persist full metadata
     if (parentId) {
@@ -1682,13 +1620,13 @@ function addItem() {
                 if (current.isHeader || current.isStandalone) break;
                 insertIndex++;
             }
-            state.items[String(listId)].splice(insertIndex, 0, newItem);
+            state.items[listId].splice(insertIndex, 0, newItem);
         } else {
-            state.items[String(listId)].push(newItem);
+            state.items[listId].push(newItem);
         }
     } else {
         // Bottom of list
-        state.items[String(listId)].push(newItem);
+        state.items[listId].push(newItem);
     }
     // Single sync call handles all cases with proper metadata
     syncOrderToSheet(listId);
@@ -1787,7 +1725,7 @@ function checkAllItems(listId, status) {
     const action = status ? "cocher" : "décocher";
 
     if (confirm(`Voulez-vous ${action} tous les éléments de "${listName}" ? L'état actuel sera réinitialisé.`)) {
-        const items = state.items[String(listId)] || [];
+        const items = state.items[listId] || [];
         items.forEach(item => {
             if (!item.isHeader) {
                 item.done = status;
@@ -1802,30 +1740,23 @@ function checkAllItems(listId, status) {
 }
 
 function closeOptions() {
-    if (modal) {
-        modal.classList.add('hidden');
-        modal.style.display = 'none';
-    }
+    modal.classList.add('hidden');
+    modal.style.display = ''; // Reset to css rule
     currentListId = null;
     currentListName = "";
 }
 
 function toggleSection(sectionIndex) {
-    const listId = state.activeListId;
-    const item = state.items[String(listId)] ? state.items[String(listId)][sectionIndex] : null;
-    if (!item) return;
-
-    const collapseKey = `${listId}-${item.id}`;
-    if (state.collapsedSections.has(collapseKey)) {
-        state.collapsedSections.delete(collapseKey);
+    if (collapsedSections.has(sectionIndex)) {
+        collapsedSections.delete(sectionIndex);
     } else {
-        state.collapsedSections.add(collapseKey);
+        collapsedSections.add(sectionIndex);
     }
     renderList(state.activeListId);
 }
 
 function openSectionOptions(index) {
-    const item = state.items[String(state.activeListId)][index];
+    const item = state.items[state.activeListId][index];
     currentListId = state.activeListId;
 
     modalTitle.innerText = item.text;
@@ -1868,7 +1799,7 @@ function openSectionOptions(index) {
 
 function updateSectionColor(index, color) {
     const listId = state.activeListId;
-    const item = state.items[String(listId)][index];
+    const item = state.items[listId][index];
     if (item) {
         item.color = color;
         renderList(listId);
@@ -1898,13 +1829,12 @@ function setupDragHandlers(element, index, isHeader) {
         if (isHeader) {
             // Find all indices of headers
             const listId = state.activeListId;
-            const items = state.items[String(listId)];
+            const items = state.items[listId];
 
             // Loop through all items and ADD to collapsed set if it's a header
             items.forEach((item, idx) => {
                 if (item.isHeader && !item.isSubHeader) {
-                    const collapseKey = `${listId}-${item.id}`;
-                    state.collapsedSections.add(collapseKey);
+                    collapsedSections.add(idx);
                 }
             });
 
@@ -2017,7 +1947,7 @@ function setupDragHandlers(element, index, isHeader) {
         if (dragIndex === dropIndex && insertAfter) return;  // Drop on self bottom
 
         const listId = state.activeListId;
-        const items = [...state.items[String(listId)]];
+        const items = [...state.items[listId]];
         const movedItem = items[dragIndex];
 
         // 1. Determine Target Index
@@ -2100,7 +2030,7 @@ function setupDragHandlers(element, index, isHeader) {
             }
         }
 
-        state.items[String(listId)] = items;
+        state.items[listId] = items;
         renderList(listId);
         syncOrderToSheet(listId);
         stopAutoScroll();
@@ -2384,8 +2314,7 @@ function updateSoundIcon() {
 }
 
 // --- Init ---
-window.onload = async function () {
-
+window.onload = function () {
     // Initialize Theme
     const savedTheme = localStorage.getItem('theme') || 'dark';
     if (savedTheme === 'light') {
@@ -2406,10 +2335,9 @@ window.onload = async function () {
     }
 
     // Supabase Auth Init
-    await checkPersistentAuth();
-    // renderHome is called inside checkPersistentAuth or fetchSupabaseData
+    checkPersistentAuth();
+    renderHome();
     initColorPicker();
-
 
     // Trigger page reveal animation
     if (app) {
@@ -2464,30 +2392,16 @@ window.onload = async function () {
     });
 
     // Initialize history state for in-app navigation
-    // CRITICAL: Do not clear hash if it contains auth tokens!
     try {
-        const hash = window.location.hash || "";
-        const hasAuthHash = hash.includes('access_token=') || 
-                            hash.includes('error=') || 
-                            hash.includes('type=recovery') ||
-                            hash.includes('type=signup') ||
-                            hash.includes('refresh_token=');
-                            
-        if (!hasAuthHash) {
-            history.replaceState({ app: 'oslist', view: 'home' }, '');
-        } else {
-            console.log("Auth hash detected in URL, blocking history.replaceState to preserve tokens.");
-        }
+        history.replaceState({ app: 'oslist', view: 'home' }, '', '');
     } catch (e) { }
 
     window.addEventListener('popstate', (e) => {
         const s = e.state;
         if (!s || s.app !== 'oslist') {
-            // If popstate is not ours, just ignore it on load to preserve auth hash!
-            if (state.userEmail) {
-                goHome();
-                try { history.pushState({ app: 'oslist', view: 'home' }, ''); } catch (err) { }
-            }
+            // If popstate is not ours, force app to home and push an app state to keep user inside
+            goHome();
+            try { history.pushState({ app: 'oslist', view: 'home' }, '', ''); } catch (err) { }
             return;
         }
 
@@ -2636,14 +2550,14 @@ window.onload = async function () {
             // final fallback: drop at end of list
             const listId = state.activeListId;
             if (listId === null || listId === undefined) return;
-            currentTouchDrop = { type: 'spacer', index: (state.items[String(listId)] || []).length, element: null };
+            currentTouchDrop = { type: 'spacer', index: (state.items[listId] || []).length, element: null };
         }
 
         try { console.log('performTouchDrop resolved target', currentTouchDrop, 'draggedIndex=', draggedIndex); } catch (e) { }
         try { showToast(`Cible: ${currentTouchDrop.type} @ ${currentTouchDrop.index}`); } catch (e) { }
         const listId = state.activeListId;
         if (listId === null || listId === undefined) return;
-        const originalItems = [...state.items[String(listId)]];
+        const originalItems = [...state.items[listId]];
         const items = [...originalItems];
         const dragIndex = draggedIndex;
         if (dragIndex === null || dragIndex === undefined) return;
@@ -2742,7 +2656,7 @@ window.onload = async function () {
             try { showToast(`Après: parentId=${movedItem.parentId ? movedItem.parentId : 'null'}`); console.log('movedItem after parent set', { id: movedItem.id, parentId: movedItem.parentId, isStandalone: movedItem.isStandalone }); } catch (e) { }
         }
 
-        state.items[String(listId)] = items;
+        state.items[listId] = items;
         try { console.log('performTouchDrop after move, new order:', items.map(i => i.text)); } catch (e) { }
         try { showToast('Relâché — mise à jour appliquée', 1600); } catch (e) { }
         clearTouchIndicator();
@@ -2857,24 +2771,23 @@ window.onload = async function () {
 // --- Service Worker Registration with Force Update Detection ---
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').then(registration => {
-            console.log('Service Worker Registered (v56)');
+        navigator.serviceWorker.register('sw.js?v=57').then(registration => {
+            console.log('SW Registered (v57)');
 
+            // Check for updates
             registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
                 installingWorker.onstatechange = () => {
                     if (installingWorker.state === 'installed') {
                         if (navigator.serviceWorker.controller) {
-                            console.log('Nouveau contenu disponible. Veuillez rafraîchir la page.');
-                            // Optionnel: on peut forcer le refresh ici si on est sûr de soi
-                        } else {
-                            console.log('Contenu mis en cache pour une utilisation hors ligne.');
+                            console.log('New content available. Close and reopen to update.');
+                            // On ne recharge PLUS automatiquement pour éviter les boucles
                         }
                     }
                 };
             };
         }).catch(err => {
-            console.error('Service Worker registration failed:', err);
+            console.error('SW Registration failed:', err);
         });
     });
 }

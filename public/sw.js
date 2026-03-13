@@ -1,13 +1,11 @@
-const CACHE_NAME = 'os-list-v56';
-
+const CACHE_NAME = 'os-list-v57';
 const ASSETS = [
     './',
     './index.html',
-    './css/style.css?v=6',
-    './js/app.js?v=56',
+    './css/style.css?v=5',
+    './js/app.js?v=57',
     './js/supabase-config.js',
-    './manifest.json',
-    './icon-512.png',
+    './manifest.webmanifest',
     './sounds/check.mp3',
     './sounds/finished.mp3',
     './sounds/remove.mp3',
@@ -37,24 +35,6 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', (event) => {
-    // Network first for HTML, JS and CSS to avoid cache traps
-    if (event.request.mode === 'navigate' || 
-        event.request.destination === 'script' || 
-        event.request.destination === 'style') {
-        event.respondWith(
-            fetch(event.request)
-                .then(response => {
-                    // Update cache with fresh version
-                    const clone = response.clone();
-                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-                    return response;
-                })
-                .catch(() => caches.match(event.request))
-        );
-        return;
-    }
-
-    // Cache first for other assets
     event.respondWith(
         caches.match(event.request).then((response) => {
             return response || fetch(event.request);
