@@ -34,8 +34,12 @@
     <h1 style="color: var(--accent-color); margin-bottom: 2rem;">OS List Manager</h1>
     <p style="margin-bottom: 2rem; color: var(--text-secondary);">Connectez-vous pour gérer vos listes.</p>
     <button id="login-button" class="btn-send"
-      style="width: auto; padding: 1rem 2rem; border-radius: 2rem; gap: 0.5rem;">
+      style="width: auto; padding: 1rem 2rem; border-radius: 2rem; gap: 0.5rem; margin-bottom: 1rem;">
       <i data-lucide="log-in"></i> Se connecter avec Google
+    </button>
+    <button id="install-button-login" class="btn-send hidden"
+      style="width: auto; padding: 0.8rem 1.5rem; border-radius: 2rem; gap: 0.5rem; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--accent-color);">
+      <i data-lucide="download"></i> Installer l'application
     </button>
   </div>
 
@@ -286,7 +290,7 @@
   </div>
 
   <script src="js/supabase-config.js"></script>
-  <script src="js/app.js?v=57"></script>
+  <script src="js/app.js?v=58"></script>
   <script>
     // Initialize Lucide Icons after load
     document.addEventListener("DOMContentLoaded", function () {

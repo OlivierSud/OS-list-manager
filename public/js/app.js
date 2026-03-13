@@ -15,6 +15,7 @@ const searchInput = document.getElementById('search-input');
 const toggleHeaderMode = document.getElementById('toggle-header-mode');
 const loginContainer = document.getElementById('login-container');
 const loginButton = document.getElementById('login-button');
+const btnInstallLogin = document.getElementById('install-button-login');
 const modal = document.getElementById('action-modal');
 const modalTitle = document.getElementById('modal-title');
 const modalDesc = document.getElementById('modal-desc');
@@ -189,6 +190,12 @@ window.addEventListener('beforeinstallprompt', (e) => {
     if (state.view === 'home' && !isStandalone) {
         if (pwaBanner) pwaBanner.classList.remove('hidden');
     }
+    
+    // Also show install button on login page if not standalone
+    if (!isStandalone && btnInstallLogin) {
+        btnInstallLogin.classList.remove('hidden');
+        btnInstallLogin.onclick = installPWAFromBanner;
+    }
 });
 
 // Function to trigger PWA install manually if needed
@@ -199,6 +206,7 @@ function installPWAFromBanner() {
             if (choiceResult.outcome === 'accepted') {
                 console.log('User accepted the PWA install');
                 if (pwaBanner) pwaBanner.classList.add('hidden');
+                if (btnInstallLogin) btnInstallLogin.classList.add('hidden');
             }
             deferredPrompt = null;
         });
@@ -2771,8 +2779,8 @@ window.onload = function () {
 // --- Service Worker Registration with Force Update Detection ---
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js?v=57').then(registration => {
-            console.log('SW Registered (v57)');
+        navigator.serviceWorker.register('sw.js?v=58').then(registration => {
+            console.log('SW Registered (v58)');
 
             // Check for updates
             registration.onupdatefound = () => {
