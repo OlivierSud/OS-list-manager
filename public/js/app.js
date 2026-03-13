@@ -37,6 +37,13 @@ const headerTitleRow = document.getElementById('header-title-row');
 const btnCheckAll = document.getElementById('btn-check-all');
 const btnUncheckAll = document.getElementById('btn-uncheck-all');
 const listActionsRow = document.getElementById('list-actions-row');
+const shareManageModal = document.getElementById('share-manage-modal');
+const shareModalOwner = document.getElementById('share-modal-owner');
+const addCollaboratorSection = document.getElementById('add-collaborator-section');
+const btnShareModalAdd = document.getElementById('btn-share-modal-add');
+const shareModalInput = document.getElementById('share-modal-input');
+const collaboratorsList = document.getElementById('collaborators-list');
+const btnShareModalClose = document.getElementById('btn-share-modal-close');
 
 // User Profile Elements
 const userProfileContainer = document.getElementById('user-profile-container');
@@ -156,7 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Cache versions
 // Cache versions
-const JS_VERSION = "48";
+const JS_VERSION = "49";
 console.log(`App loaded (v${JS_VERSION})`);
 
 console.log(`Current Hash: ${window.location.hash ? '(Present: ' + window.location.hash.substring(0, 10) + '...)' : '(None)'}`);
@@ -2798,7 +2805,7 @@ window.onload = async function () {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then(registration => {
-            console.log('Service Worker Registered (v48)');
+            console.log('Service Worker Registered (v49)');
 
             registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
