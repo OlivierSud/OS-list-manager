@@ -174,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Cache versions
 // Cache versions
-const JS_VERSION = "52";
+const JS_VERSION = "53";
 console.log(`App loaded (v${JS_VERSION})`);
 
 console.log(`Current Hash: ${window.location.hash ? '(Present: ' + window.location.hash.substring(0, 10) + '...)' : '(None)'}`);
@@ -635,7 +635,7 @@ window.leaveList = leaveList;
 
 async function syncOrderToSheet(listId) {
     if (!state.userEmail) return;
-    const items = state.items[listId] || [];
+    const items = state.items[String(listId)] || [];
 
     const tasksToUpsert = items.map((item, index) => ({
         id: (item.id && item.id.toString().length > 10) ? item.id : undefined,
@@ -730,7 +730,7 @@ async function duplicateListInSupabase(listId) {
         if (listError) throw listError;
 
         // 2. Clone tasks
-        const tasks = state.items[listId] || [];
+        const tasks = state.items[String(listId)] || [];
         const tasksToInsert = tasks.map((t, idx) => ({
             list_id: newList[0].id,
             text: t.text,
@@ -1030,7 +1030,7 @@ function renderHome() {
     }
 
     state.lists.forEach(list => {
-        const listItems = state.items[list.id] || [];
+        const listItems = state.items[String(list.id)] || [];
         const itemCount = listItems.filter(i => !i.isHeader).length;
 
         const el = document.createElement('div');
@@ -1472,7 +1472,7 @@ function deleteListItem(index, e) {
     const listId = state.activeListId;
     if (!listId && listId !== 0) return;
 
-    const items = state.items[listId];
+    const items = state.items[String(listId)];
     if (!items || !items[index]) return;
 
     // Center of explosion from event if available, otherwise fallback to bounding rect
@@ -1500,7 +1500,7 @@ function deleteListItem(index, e) {
         // Delay real deletion to show animation
         setTimeout(() => {
             // Recheck items in case state changed
-            const freshItems = state.items[listId];
+            const freshItems = state.items[String(listId)];
             if (freshItems && freshItems[index]) {
                 const itemIdToDelete = freshItems[index].id;
                 freshItems.splice(index, 1);
@@ -1571,7 +1571,7 @@ function startInlineEdit(element, index) {
         const newText = input.value.trim();
         if (newText && newText !== originalText) {
             const listId = state.activeListId;
-            state.items[listId][index].text = newText;
+            state.items[String(listId)][index].text = newText;
             syncOrderToSheet(listId);
         }
         renderList(state.activeListId);
@@ -1606,8 +1606,8 @@ function goHome() {
 
 function toggleItem(itemId) {
     const listId = state.activeListId;
-    const items = state.items[listId];
-    const item = items.find(i => String(i.id) === String(itemId));
+    const items = state.items[String(listId)];
+    const item = items ? items.find(i => String(i.id) === String(itemId)) : null;
 
     if (item) {
         item.done = !item.done;
@@ -1628,7 +1628,7 @@ function addItem() {
 
     let parentId = null;
     let isStandalone = true;
-    const items = state.items[listId] || [];
+    const items = state.items[String(listId)] || [];
 
     if (!isHeader) {
         if (state.selectedSectionId) {
@@ -1653,7 +1653,7 @@ function addItem() {
         lastModifier: state.userEmail
     };
 
-    if (!state.items[listId]) state.items[listId] = [];
+    if (!state.items[String(listId)]) state.items[String(listId)] = [];
 
     // Insertion Logic — always use syncOrderToSheet to persist full metadata
     if (parentId) {
@@ -1666,13 +1666,13 @@ function addItem() {
                 if (current.isHeader || current.isStandalone) break;
                 insertIndex++;
             }
-            state.items[listId].splice(insertIndex, 0, newItem);
+            state.items[String(listId)].splice(insertIndex, 0, newItem);
         } else {
-            state.items[listId].push(newItem);
+            state.items[String(listId)].push(newItem);
         }
     } else {
         // Bottom of list
-        state.items[listId].push(newItem);
+        state.items[String(listId)].push(newItem);
     }
     // Single sync call handles all cases with proper metadata
     syncOrderToSheet(listId);
@@ -1771,7 +1771,7 @@ function checkAllItems(listId, status) {
     const action = status ? "cocher" : "décocher";
 
     if (confirm(`Voulez-vous ${action} tous les éléments de "${listName}" ? L'état actuel sera réinitialisé.`)) {
-        const items = state.items[listId] || [];
+        const items = state.items[String(listId)] || [];
         items.forEach(item => {
             if (!item.isHeader) {
                 item.done = status;
@@ -1785,16 +1785,9 @@ function checkAllItems(listId, status) {
     }
 }
 
-function closeOptions() {
-    modal.classList.add('hidden');
-    modal.style.display = ''; // Reset to css rule
-    currentListId = null;
-    currentListName = "";
-}
-
 function toggleSection(sectionIndex) {
     const listId = state.activeListId;
-    const item = state.items[listId] ? state.items[listId][sectionIndex] : null;
+    const item = state.items[String(listId)] ? state.items[String(listId)][sectionIndex] : null;
     if (!item) return;
 
     const collapseKey = `${listId}-${item.id}`;
@@ -1807,7 +1800,7 @@ function toggleSection(sectionIndex) {
 }
 
 function openSectionOptions(index) {
-    const item = state.items[state.activeListId][index];
+    const item = state.items[String(state.activeListId)][index];
     currentListId = state.activeListId;
 
     modalTitle.innerText = item.text;
@@ -1850,7 +1843,7 @@ function openSectionOptions(index) {
 
 function updateSectionColor(index, color) {
     const listId = state.activeListId;
-    const item = state.items[listId][index];
+    const item = state.items[String(listId)][index];
     if (item) {
         item.color = color;
         renderList(listId);
@@ -1880,7 +1873,7 @@ function setupDragHandlers(element, index, isHeader) {
         if (isHeader) {
             // Find all indices of headers
             const listId = state.activeListId;
-            const items = state.items[listId];
+            const items = state.items[String(listId)];
 
             // Loop through all items and ADD to collapsed set if it's a header
             items.forEach((item, idx) => {
@@ -1999,7 +1992,7 @@ function setupDragHandlers(element, index, isHeader) {
         if (dragIndex === dropIndex && insertAfter) return;  // Drop on self bottom
 
         const listId = state.activeListId;
-        const items = [...state.items[listId]];
+        const items = [...state.items[String(listId)]];
         const movedItem = items[dragIndex];
 
         // 1. Determine Target Index
@@ -2082,7 +2075,7 @@ function setupDragHandlers(element, index, isHeader) {
             }
         }
 
-        state.items[listId] = items;
+        state.items[String(listId)] = items;
         renderList(listId);
         syncOrderToSheet(listId);
         stopAutoScroll();
@@ -2618,14 +2611,14 @@ window.onload = async function () {
             // final fallback: drop at end of list
             const listId = state.activeListId;
             if (listId === null || listId === undefined) return;
-            currentTouchDrop = { type: 'spacer', index: (state.items[listId] || []).length, element: null };
+            currentTouchDrop = { type: 'spacer', index: (state.items[String(listId)] || []).length, element: null };
         }
 
         try { console.log('performTouchDrop resolved target', currentTouchDrop, 'draggedIndex=', draggedIndex); } catch (e) { }
         try { showToast(`Cible: ${currentTouchDrop.type} @ ${currentTouchDrop.index}`); } catch (e) { }
         const listId = state.activeListId;
         if (listId === null || listId === undefined) return;
-        const originalItems = [...state.items[listId]];
+        const originalItems = [...state.items[String(listId)]];
         const items = [...originalItems];
         const dragIndex = draggedIndex;
         if (dragIndex === null || dragIndex === undefined) return;
@@ -2724,7 +2717,7 @@ window.onload = async function () {
             try { showToast(`Après: parentId=${movedItem.parentId ? movedItem.parentId : 'null'}`); console.log('movedItem after parent set', { id: movedItem.id, parentId: movedItem.parentId, isStandalone: movedItem.isStandalone }); } catch (e) { }
         }
 
-        state.items[listId] = items;
+        state.items[String(listId)] = items;
         try { console.log('performTouchDrop after move, new order:', items.map(i => i.text)); } catch (e) { }
         try { showToast('Relâché — mise à jour appliquée', 1600); } catch (e) { }
         clearTouchIndicator();
@@ -2840,7 +2833,7 @@ window.onload = async function () {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then(registration => {
-            console.log('Service Worker Registered (v51)');
+            console.log('Service Worker Registered (v53)');
 
             registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
