@@ -176,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Cache versions
 // Cache versions
-const JS_VERSION = "55";
+const JS_VERSION = "56";
 console.log(`App loaded (v${JS_VERSION})`);
 
 console.log(`Current Hash: ${window.location.hash ? '(Present: ' + window.location.hash.substring(0, 10) + '...)' : '(None)'}`);
@@ -1389,7 +1389,7 @@ function renderList(listId) {
 
                 el.innerHTML = `
                     <span class="drag-handle"></span>
-                    <div class="task-checkbox" onclick="event.stopPropagation(); toggleItem('${item.id}')">
+                    <div class="task-checkbox" onclick="event.stopPropagation(); window.toggleItem('${item.id}')">
                         ${checkIcon}
                     </div>
                     <span class="item-text" style="flex: 1" onclick="event.stopPropagation(); startInlineEdit(this, ${index})">${item.text}</span>
@@ -1617,9 +1617,13 @@ function toggleItem(itemId) {
     const item = items.find(i => String(i.id) === String(itemId));
 
     if (item) {
-        console.log(`[toggleItem] Item found: "${item.text}", current state: ${item.done}`);
-        item.done = !item.done;
-        console.log(`[toggleItem] New state: ${item.done}`);
+        console.log(`[toggleItem] Item found: "${item.text}", current state: ${item.done} (Type: ${typeof item.done})`);
+        
+        // Convert to strict boolean before flipping
+        const isCurrentlyDone = (item.done === true || item.done === 'true' || item.done === 'TRUE');
+        item.done = !isCurrentlyDone;
+        
+        console.log(`[toggleItem] New strict boolean state: ${item.done}`);
         if (item.done) playSound('check');
         renderList(listId); // Re-render to update UI
 
@@ -1629,6 +1633,7 @@ function toggleItem(itemId) {
         console.warn(`[toggleItem] Item NOT found for itemId: ${itemId}. Available item IDs:`, items.map(i => i.id));
     }
 }
+window.toggleItem = toggleItem;
 
 function addItem() {
     const text = newTaskInput.value.trim();
@@ -2853,7 +2858,7 @@ window.onload = async function () {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then(registration => {
-            console.log('Service Worker Registered (v55)');
+            console.log('Service Worker Registered (v56)');
 
             registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
