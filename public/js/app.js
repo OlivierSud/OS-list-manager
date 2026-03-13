@@ -70,6 +70,8 @@ let touchLastX = 0, touchLastY = 0;
 let touchGhost = null;
 let touchLongPressTimer = null;
 let _blankDragImage = null; // Used to hide native drag ghost on desktop
+let currentListId = null;
+let currentListName = "";
 
 // State
 let state = {
@@ -174,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Cache versions
 // Cache versions
-const JS_VERSION = "53";
+const JS_VERSION = "54";
 console.log(`App loaded (v${JS_VERSION})`);
 
 console.log(`Current Hash: ${window.location.hash ? '(Present: ' + window.location.hash.substring(0, 10) + '...)' : '(None)'}`);
@@ -1785,6 +1787,15 @@ function checkAllItems(listId, status) {
     }
 }
 
+function closeOptions() {
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+    }
+    currentListId = null;
+    currentListName = "";
+}
+
 function toggleSection(sectionIndex) {
     const listId = state.activeListId;
     const item = state.items[String(listId)] ? state.items[String(listId)][sectionIndex] : null;
@@ -2833,7 +2844,7 @@ window.onload = async function () {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then(registration => {
-            console.log('Service Worker Registered (v53)');
+            console.log('Service Worker Registered (v54)');
 
             registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
