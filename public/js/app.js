@@ -176,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Cache versions
 // Cache versions
-const JS_VERSION = "54";
+const JS_VERSION = "55";
 console.log(`App loaded (v${JS_VERSION})`);
 
 console.log(`Current Hash: ${window.location.hash ? '(Present: ' + window.location.hash.substring(0, 10) + '...)' : '(None)'}`);
@@ -1371,7 +1371,7 @@ function renderList(listId) {
                     el.style.borderLeftColor = parentColor;
                 } else if (item.parentId) {
                     // Check grandparent color if parent is a subheader without color
-                    const parentHeader = currentItems.find(i => i.isHeader && i.id === item.parentId);
+                    const parentHeader = currentItems.find(i => i.isHeader && String(i.id) === String(item.parentId));
                     if (parentHeader && parentHeader.parentId) {
                         const grandParent = currentItems.find(i => i.isHeader && String(i.id) === String(parentHeader.parentId));
                         if (grandParent && grandParent.color) {
@@ -1608,16 +1608,25 @@ function goHome() {
 
 function toggleItem(itemId) {
     const listId = state.activeListId;
+    console.log(`[toggleItem] Attempting to toggle itemId: ${itemId} in listId: ${listId}`);
     const items = state.items[String(listId)];
-    const item = items ? items.find(i => String(i.id) === String(itemId)) : null;
+    if (!items) {
+        console.error(`[toggleItem] No items found for listId: ${listId}`);
+        return;
+    }
+    const item = items.find(i => String(i.id) === String(itemId));
 
     if (item) {
+        console.log(`[toggleItem] Item found: "${item.text}", current state: ${item.done}`);
         item.done = !item.done;
+        console.log(`[toggleItem] New state: ${item.done}`);
         if (item.done) playSound('check');
         renderList(listId); // Re-render to update UI
 
         // Sync with Cloud
         syncOrderToSheet(listId);
+    } else {
+        console.warn(`[toggleItem] Item NOT found for itemId: ${itemId}. Available item IDs:`, items.map(i => i.id));
     }
 }
 
@@ -2844,7 +2853,7 @@ window.onload = async function () {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then(registration => {
-            console.log('Service Worker Registered (v54)');
+            console.log('Service Worker Registered (v55)');
 
             registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
