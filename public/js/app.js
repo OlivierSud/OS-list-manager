@@ -156,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Cache versions
 // Cache versions
-const JS_VERSION = "47";
+const JS_VERSION = "48";
 console.log(`App loaded (v${JS_VERSION})`);
 
 console.log(`Current Hash: ${window.location.hash ? '(Present: ' + window.location.hash.substring(0, 10) + '...)' : '(None)'}`);
@@ -217,28 +217,35 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function checkPersistentAuth() {
-    console.log("Checking persistent auth...");
+    console.log("--- AUTH CHECK START ---");
     if (!window.supabaseClient) {
-        console.error("Erreur: supabaseClient n'est pas initialisé !");
+        console.error("❌ Erreur: supabaseClient n'est pas initialisé !");
         return;
     }
 
-    // Subscribe to auth changes
-    supabaseClient.auth.onAuthStateChange((event, currentSession) => {
-        console.log("Auth event:", event, currentSession ? "User found" : "No user");
+    let isFetching = false;
+
+    // 1. Subscribe to auth changes
+    supabaseClient.auth.onAuthStateChange(async (event, currentSession) => {
+        console.log("🔔 Auth event:", event, currentSession ? `User found: ${currentSession.user.email}` : "No user");
         
         if (currentSession && currentSession.user) {
             const hasUserChanged = state.userEmail !== currentSession.user.email;
             state.userEmail = currentSession.user.email;
             state.userPicture = currentSession.user.user_metadata?.avatar_url || null;
             
-            // Fetch data on login or session init
-            if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
-                fetchSupabaseData();
-            } else if (hasUserChanged) {
-                renderHome();
+            // Only fetch if not already fetching or if user changed
+            if (!isFetching) {
+                if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+                    isFetching = true;
+                    await fetchSupabaseData();
+                    isFetching = false;
+                } else if (hasUserChanged) {
+                    renderHome();
+                }
             }
         } else if (event === 'SIGNED_OUT') {
+            console.log("🚪 User signed out");
             state.userEmail = null;
             state.userPicture = null;
             state.lists = [];
@@ -247,26 +254,45 @@ async function checkPersistentAuth() {
         }
     });
 
-    // Check initial session
+    // 2. Initial check for existing session
     try {
+        console.log("🔍 Fetching current session...");
         const { data: { session }, error } = await supabaseClient.auth.getSession();
+        
         if (error) {
-            console.error("Session Retrieval Error:", error.message);
+            console.error("❌ Session Retrieval Error:", error.message);
             renderHome();
             return;
         }
         
         if (session && session.user) {
-            console.log("Session recovery success:", session.user.email);
+            console.log("✅ Session recovery success:", session.user.email);
             state.userEmail = session.user.email;
             state.userPicture = session.user.user_metadata?.avatar_url || null;
-            await fetchSupabaseData();
+            
+            if (!isFetching) {
+                isFetching = true;
+                await fetchSupabaseData();
+                isFetching = false;
+            }
         } else {
-            console.log("No active session found.");
-            renderHome();
+            // No session found.
+            // Check if we have a hash - if so, Supabase might still be processing it (async)
+            const hasHash = window.location.hash && (
+                window.location.hash.includes('access_token=') || 
+                window.location.hash.includes('error=')
+            );
+            
+            if (hasHash) {
+                console.log("⏳ Auth hash detected, waiting for onAuthStateChange...");
+                // Don't render home yet, wait for the event listener above to catch it
+            } else {
+                console.log("ℹ️ No active session and no auth hash. Showing login.");
+                renderHome();
+            }
         }
     } catch (e) {
-        console.error("Session check error (fatal):", e);
+        console.error("❌ Session check error (fatal):", e);
         renderHome();
     }
 }
@@ -2772,7 +2798,7 @@ window.onload = async function () {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then(registration => {
-            console.log('Service Worker Registered (v37)');
+            console.log('Service Worker Registered (v48)');
 
             registration.onupdatefound = () => {
                 const installingWorker = registration.installing;
