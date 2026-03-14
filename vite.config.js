@@ -15,6 +15,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
+        id: 'os-list-manager-v1',
         name: 'OS List Manager',
         short_name: 'Mes Listes',
         description: 'Gérez vos listes de tâches synchronisées avec Supabase.',
