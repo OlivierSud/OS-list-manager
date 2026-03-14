@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, List, CheckSquare, Settings, ArrowLeft, RefreshCw } from 'lucide-react'
+import { Plus, List, CheckSquare, Settings, ArrowLeft, RefreshCw, Users } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { fetchSheetData } from './utils/googleSheets'
 import InstallPWA from './components/InstallPWA'
@@ -108,6 +108,9 @@ function App() {
                     </h1>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <a href="./stats.html" style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', marginRight: '0.5rem' }} title="Statistiques">
+                        <Users size={20} />
+                    </a>
                     <InstallPWA />
                     <button
                         onClick={loadData}
