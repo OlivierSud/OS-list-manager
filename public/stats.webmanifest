@@ -1,6 +1,6 @@
 {
-  "name": "OS Stats Manager",
-  "short_name": "Stats Listes",
+  "name": "OS Stats Dashboard",
+  "short_name": "Dashboard",
   "description": "Statistiques d'utilisation de OS List Manager.",
   "id": "os-stats-manager-v1",
   "start_url": "./stats.html",
@@ -10,19 +10,19 @@
   "theme_color": "#3b82f6",
   "icons": [
     {
-      "src": "icon-512.png",
+      "src": "icon-stats.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icon-512.png",
+      "src": "icon-stats.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icon-512.png",
+      "src": "icon-stats.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

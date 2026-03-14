@@ -48,25 +48,13 @@ export default function StatsDashboard() {
 
     const fetchStats = async () => {
         setLoading(true)
-        const version = "V3-auth-check"
-        console.log(`[StatsDashboard ${version}] Fetching stats started...`)
         try {
             const supabase = window.supabaseClient
             if (!supabase) {
-                console.error(`[StatsDashboard ${version}] Supabase client not found.`)
                 setLoading(false)
                 return
             }
 
-            // Check session
-            const { data: { session } } = await supabase.auth.getSession()
-            if (!session) {
-                console.warn(`[StatsDashboard ${version}] No active session found.`)
-            } else {
-                console.log(`[StatsDashboard ${version}] Logged in as: ${session.user.email}`)
-            }
-
-            console.log(`[StatsDashboard ${version}] Querying data...`)
             const [listsRes, tasksRes, detailsRes] = await Promise.all([
                 supabase.from('lists').select('*'),
                 supabase.from('tasks').select('last_modifier, created_at, is_header, list_id'),
