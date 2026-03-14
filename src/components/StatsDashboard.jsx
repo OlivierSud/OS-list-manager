@@ -48,20 +48,30 @@ export default function StatsDashboard() {
 
     const fetchStats = async () => {
         setLoading(true)
-        console.log('Fetching stats started...')
+        const version = "V2-details-fix"
+        console.log(`[StatsDashboard ${version}] Fetching stats started...`)
         try {
             const supabase = window.supabaseClient
             if (!supabase) {
-                console.error('Supabase client not found on window.')
+                console.error(`[StatsDashboard ${version}] Supabase client not found.`)
                 setLoading(false)
                 return
             }
 
+            console.log(`[StatsDashboard ${version}] Querying vue_details_listes...`)
             const [listsRes, tasksRes, detailsRes] = await Promise.all([
                 supabase.from('lists').select('*'),
                 supabase.from('tasks').select('last_modifier, created_at, is_header, list_id'),
-                supabase.from('vue_details_listes').select('email') // Assuming 'email' is the column name
+                supabase.from('vue_details_listes').select('*')
             ])
+
+            console.log('Lists Response:', listsRes)
+            console.log('Tasks Response:', tasksRes)
+            console.log('Details View Response:', detailsRes)
+
+            if (listsRes.error) console.error('Error fetching lists:', listsRes.error)
+            if (tasksRes.error) console.error('Error fetching tasks:', tasksRes.error)
+            if (detailsRes.error) console.error('Error fetching details:', detailsRes.error)
 
             const lists = listsRes.data || []
             const tasks = tasksRes.data || []
