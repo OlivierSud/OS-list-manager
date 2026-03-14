@@ -16,6 +16,7 @@ export default function StatsDashboard() {
     const [deferredPrompt, setDeferredPrompt] = useState(null)
     const [showAlreadyInstalled, setShowAlreadyInstalled] = useState(false)
     const [isInstalled, setIsInstalled] = useState(false)
+    const [currentUser, setCurrentUser] = useState(null)
 
     const checkStandalone = () =>
         window.matchMedia('(display-mode: standalone)').matches ||
@@ -23,6 +24,7 @@ export default function StatsDashboard() {
 
     useEffect(() => {
         setIsInstalled(checkStandalone())
+        checkUser()
         if (isAuthorized) {
             fetchStats()
         }
@@ -34,6 +36,24 @@ export default function StatsDashboard() {
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
         return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
     }, [isAuthorized])
+
+    const checkUser = async () => {
+        const supabase = window.supabaseClient
+        if (!supabase) return
+        const { data: { session } } = await supabase.auth.getSession()
+        setCurrentUser(session?.user || null)
+    }
+
+    const handleLogin = async () => {
+        const supabase = window.supabaseClient
+        if (!supabase) return
+        await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: window.location.href
+            }
+        })
+    }
 
     const handlePasscodeSubmit = (e) => {
         e.preventDefault()
@@ -177,6 +197,22 @@ export default function StatsDashboard() {
                             Déverrouiller <ChevronRight size={20} />
                         </motion.button>
                     </form>
+
+                    <div style={{ marginTop: '2rem', padding: '1rem', borderRadius: '1rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        {currentUser ? (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', fontSize: '0.85rem', color: '#10b981' }}>
+                                <ShieldCheck size={16} /> Connecté : {currentUser.email}
+                            </div>
+                        ) : (
+                            <div>
+                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Pour voir toutes les données, connectez-vous avec votre mail admin.</p>
+                                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleLogin} style={{ width: '100%', padding: '0.75rem', borderRadius: '0.75rem', background: 'white', color: '#0f172a', border: 'none', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="16" height="16" /> Se connecter avec Google
+                                </motion.button>
+                            </div>
+                        )}
+                    </div>
+
                     <div style={{ marginTop: '2.5rem' }}>
                         <a href="./index.html" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                             <ArrowLeft size={16} /> Retour
@@ -206,9 +242,16 @@ export default function StatsDashboard() {
                     <a href="./index.html" style={{ color: 'var(--text-secondary)' }}><ArrowLeft size={24} /></a>
                     <h1 style={{ fontSize: '1.5rem', margin: 0, background: 'linear-gradient(135deg, #3b82f6, #6366f1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Stats Dashboard</h1>
                 </div>
-                <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={handleInstall} className="btn" style={{ padding: '0.6rem 1rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #3b82f6, #6366f1)', display: 'flex', alignItems: 'center', gap: '0.5rem', border: 'none', color: 'white', borderRadius: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>
-                    <Download size={16} /> Installer
-                </motion.button>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    {currentUser && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.1)', padding: '0.4rem 0.8rem', borderRadius: '0.5rem', color: '#10b981', fontSize: '0.75rem' }}>
+                            <ShieldCheck size={14} /> Admin
+                        </div>
+                    )}
+                    <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={handleInstall} className="btn" style={{ padding: '0.6rem 1rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #3b82f6, #6366f1)', display: 'flex', alignItems: 'center', gap: '0.5rem', border: 'none', color: 'white', borderRadius: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>
+                        <Download size={16} /> Installer
+                    </motion.button>
+                </div>
             </header>
 
             <nav style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', background: 'rgba(15, 23, 42, 0.5)', padding: '0.5rem', borderRadius: '1rem' }}>

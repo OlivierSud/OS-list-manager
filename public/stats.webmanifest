@@ -1,6 +1,6 @@
 {
   "name": "OS Stats Dashboard",
-  "short_name": "Dashboard",
+  "short_name": "OS Stats",
   "description": "Statistiques d'utilisation de OS List Manager.",
   "id": "os-stats-manager-v1",
   "start_url": "./stats.html",
