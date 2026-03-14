@@ -107,7 +107,8 @@ function App() {
                         {view === 'home' ? 'My Lists' : activeListData?.name}
                     </h1>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <InstallPWA />
                     <button
                         onClick={loadData}
                         style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
@@ -255,8 +256,6 @@ function App() {
                 </button>
             )}
 
-            {/* Bannière d'installation PWA */}
-            <InstallPWA />
         </div>
     )
 }
