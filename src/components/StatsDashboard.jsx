@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Users, List, Share2, Download, ArrowLeft, Calendar, Mail, ShieldCheck, Lock, KeyRound, ChevronRight } from 'lucide-react'
+import { Users, List, Share2, Download, ArrowLeft, Calendar, Mail, ShieldCheck, Lock, KeyRound, ChevronRight, X } from 'lucide-react'
 
 export default function StatsDashboard() {
     const [isAuthorized, setIsAuthorized] = useState(false)
@@ -14,8 +14,17 @@ export default function StatsDashboard() {
     })
     const [loading, setLoading] = useState(true)
     const [deferredPrompt, setDeferredPrompt] = useState(null)
+    const [showAlreadyInstalled, setShowAlreadyInstalled] = useState(false)
+    const [isInstalled, setIsInstalled] = useState(false)
+
+    // Détecte si l'app est déjà installée en mode standalone
+    const checkStandalone = () =>
+        window.matchMedia('(display-mode: standalone)').matches ||
+        window.navigator.standalone === true
 
     useEffect(() => {
+        setIsInstalled(checkStandalone())
+        
         // Only fetch stats if authorized
         if (isAuthorized) {
             fetchStats()
@@ -42,14 +51,34 @@ export default function StatsDashboard() {
 
     const fetchStats = async () => {
         setLoading(true)
+        console.log('Fetching stats started...')
         try {
             const supabase = window.supabaseClient
-            const { data: lists } = await supabase.from('lists').select('*')
-            const { data: tasks } = await supabase.from('tasks').select('last_modifier, created_at, is_header, list_id')
-            const { data: shares } = await supabase.from('shares').select('*')
+            if (!supabase) {
+                console.error('Supabase client not found on window. Ensure supabase-config.js is loaded.')
+                setLoading(false)
+                return
+            }
+
+            // Fetch data from multiple tables in parallel
+            const [listsRes, tasksRes, sharesRes] = await Promise.all([
+                supabase.from('lists').select('*'),
+                supabase.from('tasks').select('last_modifier, created_at, is_header, list_id'),
+                supabase.from('shares').select('*')
+            ])
+
+            if (listsRes.error) console.error('Error fetching lists:', listsRes.error)
+            if (tasksRes.error) console.error('Error fetching tasks:', tasksRes.error)
+            if (sharesRes.error) console.error('Error fetching shares:', sharesRes.error)
+
+            const lists = listsRes.data || []
+            const tasks = tasksRes.data || []
+            const shares = sharesRes.data || []
+
+            console.log(`Stats fetched: ${lists.length} lists, ${tasks.length} tasks, ${shares.length} shares`)
 
             const userMap = new Map()
-            tasks?.forEach(task => {
+            tasks.forEach(task => {
                 const email = task.last_modifier?.toLowerCase()
                 if (email) {
                     const date = new Date(task.created_at)
@@ -68,7 +97,7 @@ export default function StatsDashboard() {
             }))
 
             const taskCounts = new Map()
-            tasks?.forEach(task => {
+            tasks.forEach(task => {
                 if (!task.is_header) {
                     taskCounts.set(task.list_id, (taskCounts.get(task.list_id) || 0) + 1)
                 }
@@ -76,20 +105,28 @@ export default function StatsDashboard() {
 
             setStats({
                 users: users.sort((a, b) => b.lastModDate - a.lastModDate),
-                lists: (lists || []).map(l => ({ ...l, itemCount: taskCounts.get(l.id) || 0 })),
-                shares: shares || []
+                lists: lists.map(l => ({ ...l, itemCount: taskCounts.get(l.id) || 0 })),
+                shares: shares
             })
         } catch (error) {
-            console.error('Error fetching stats:', error)
+            console.error('Critical error in fetchStats:', error)
         }
         setLoading(false)
     }
 
     const handleInstall = async () => {
+        if (isInstalled || !deferredPrompt) {
+            setShowAlreadyInstalled(true)
+            return
+        }
+
         if (deferredPrompt) {
             deferredPrompt.prompt()
             const { outcome } = await deferredPrompt.userChoice
-            if (outcome === 'accepted') setDeferredPrompt(null)
+            if (outcome === 'accepted') {
+                setDeferredPrompt(null)
+                setIsInstalled(true)
+            }
         }
     }
 
@@ -117,6 +154,31 @@ export default function StatsDashboard() {
                         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
                     }}
                 >
+                    <div style={{ position: 'absolute', top: '1rem', right: '1rem' }}>
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={handleInstall}
+                            className="btn"
+                            style={{ 
+                                padding: '0.6rem 1rem', 
+                                fontSize: '0.85rem',
+                                background: 'rgba(59, 130, 246, 0.1)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                border: '1px solid rgba(59, 130, 246, 0.2)',
+                                color: '#3b82f6',
+                                borderRadius: '0.75rem',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            <Download size={16} />
+                            Installer
+                        </motion.button>
+                    </div>
+
                     <div style={{ 
                         width: '80px', 
                         height: '80px', 
@@ -204,6 +266,102 @@ export default function StatsDashboard() {
                         </a>
                     </div>
                 </motion.div>
+
+                {/* Popup Déjà Installé (Lock Screen version) */}
+                <AnimatePresence>
+                    {showAlreadyInstalled && (
+                        <div style={{
+                            position: 'fixed',
+                            inset: 0,
+                            zIndex: 2000,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '1rem'
+                        }}>
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={() => setShowAlreadyInstalled(false)}
+                                style={{
+                                    position: 'absolute',
+                                    inset: 0,
+                                    background: 'rgba(2, 6, 23, 0.8)',
+                                    backdropFilter: 'blur(8px)'
+                                }}
+                            />
+                            <motion.div
+                                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                                animate={{ scale: 1, opacity: 1, y: 0 }}
+                                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                                style={{
+                                    position: 'relative',
+                                    width: '100%',
+                                    maxWidth: '340px',
+                                    background: 'rgba(15, 23, 42, 0.95)',
+                                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                                    borderRadius: '1.5rem',
+                                    padding: '2rem',
+                                    boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+                                    textAlign: 'center'
+                                }}
+                            >
+                                <button
+                                    onClick={() => setShowAlreadyInstalled(false)}
+                                    style={{
+                                        position: 'absolute',
+                                        top: '1rem',
+                                        right: '1rem',
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'var(--text-secondary)',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <X size={20} />
+                                </button>
+                                <div style={{
+                                    width: '64px',
+                                    height: '64px',
+                                    borderRadius: '50%',
+                                    background: 'rgba(16, 185, 129, 0.1)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    margin: '0 auto 1.5rem',
+                                    border: '1px solid rgba(16, 185, 129, 0.2)'
+                                }}>
+                                    <ShieldCheck size={32} color="#10b981" />
+                                </div>
+                                <h2 style={{ fontSize: '1.25rem', marginBottom: '0.75rem', color: '#f8fafc' }}>
+                                    Déjà installée !
+                                </h2>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: 0, lineHeight: 1.5 }}>
+                                    L'application de statistiques est déjà sur votre appareil.
+                                </p>
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => setShowAlreadyInstalled(false)}
+                                    style={{
+                                        marginTop: '2rem',
+                                        width: '100%',
+                                        padding: '0.8rem',
+                                        borderRadius: '0.75rem',
+                                        background: 'rgba(59, 130, 246, 0.1)',
+                                        border: '1px solid rgba(59, 130, 246, 0.2)',
+                                        color: '#3b82f6',
+                                        fontWeight: 600,
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    J'ai compris
+                                </motion.button>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
             </div>
         )
     }
@@ -231,19 +389,125 @@ export default function StatsDashboard() {
                     </h1>
                 </div>
 
-                {deferredPrompt && (
-                    <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={handleInstall}
-                        className="btn"
-                        style={{ padding: '0.6rem 1rem', fontSize: '0.85rem' }}
-                    >
-                        <Download size={16} />
-                        Installer Stats
-                    </motion.button>
-                )}
+                <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleInstall}
+                    className="btn"
+                    style={{ 
+                        padding: '0.6rem 1rem', 
+                        fontSize: '0.85rem',
+                        background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        border: 'none',
+                        color: 'white',
+                        borderRadius: '0.75rem',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                    }}
+                >
+                    <Download size={16} />
+                    Installer
+                </motion.button>
             </header>
+
+            {/* Popup Déjà Installé */}
+            <AnimatePresence>
+                {showAlreadyInstalled && (
+                    <div style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 2000,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '1rem'
+                    }}>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowAlreadyInstalled(false)}
+                            style={{
+                                position: 'absolute',
+                                inset: 0,
+                                background: 'rgba(2, 6, 23, 0.8)',
+                                backdropFilter: 'blur(8px)'
+                            }}
+                        />
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            style={{
+                                position: 'relative',
+                                width: '100%',
+                                maxWidth: '340px',
+                                background: 'rgba(15, 23, 42, 0.95)',
+                                border: '1px solid rgba(59, 130, 246, 0.3)',
+                                borderRadius: '1.5rem',
+                                padding: '2rem',
+                                boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+                                textAlign: 'center'
+                            }}
+                        >
+                            <button
+                                onClick={() => setShowAlreadyInstalled(false)}
+                                style={{
+                                    position: 'absolute',
+                                    top: '1rem',
+                                    right: '1rem',
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'var(--text-secondary)',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                <X size={20} />
+                            </button>
+                            <div style={{
+                                width: '64px',
+                                height: '64px',
+                                borderRadius: '50%',
+                                background: 'rgba(16, 185, 129, 0.1)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 1.5rem',
+                                border: '1px solid rgba(16, 185, 129, 0.2)'
+                            }}>
+                                <ShieldCheck size={32} color="#10b981" />
+                            </div>
+                            <h2 style={{ fontSize: '1.25rem', marginBottom: '0.75rem', color: '#f8fafc' }}>
+                                Déjà installée !
+                            </h2>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: 0, lineHeight: 1.5 }}>
+                                L'application de statistiques est déjà sur votre appareil.
+                            </p>
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => setShowAlreadyInstalled(false)}
+                                style={{
+                                    marginTop: '2rem',
+                                    width: '100%',
+                                    padding: '0.8rem',
+                                    borderRadius: '0.75rem',
+                                    background: 'rgba(59, 130, 246, 0.1)',
+                                    border: '1px solid rgba(59, 130, 246, 0.2)',
+                                    color: '#3b82f6',
+                                    fontWeight: 600,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                J'ai compris
+                            </motion.button>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
             {/* Tabs */}
             <nav style={{ 
