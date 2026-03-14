@@ -79,6 +79,9 @@ export default function StatsDashboard() {
                 console.error('Error fetching details:', detailsRes.error)
                 // If 400, maybe the view doesn't exist or column is wrong
             }
+            const lists = listsRes.data || []
+            const tasks = tasksRes.data || []
+            const details = detailsRes.data || []
 
             console.log(`[StatsDashboard ${version}] Result counts: ${lists.length} lists, ${tasks.length} tasks, ${details.length} details`)
             console.log(`[StatsDashboard ${version}] Raw details sample:`, details.slice(0, 3))
