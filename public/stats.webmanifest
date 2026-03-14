@@ -2,7 +2,7 @@
   "name": "OS Stats Manager",
   "short_name": "Stats Listes",
   "description": "Statistiques d'utilisation de OS List Manager.",
-  "id": "/OS-list-manager/stats/",
+  "id": "os-stats-manager-v1",
   "start_url": "./stats.html",
   "scope": "./",
   "display": "standalone",
