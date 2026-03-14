@@ -48,7 +48,7 @@ export default function StatsDashboard() {
 
     const fetchStats = async () => {
         setLoading(true)
-        const version = "V2-details-fix"
+        const version = "V3-auth-check"
         console.log(`[StatsDashboard ${version}] Fetching stats started...`)
         try {
             const supabase = window.supabaseClient
@@ -58,24 +58,33 @@ export default function StatsDashboard() {
                 return
             }
 
-            console.log(`[StatsDashboard ${version}] Querying vue_details_listes...`)
+            // Check session
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session) {
+                console.warn(`[StatsDashboard ${version}] No active session found.`)
+            } else {
+                console.log(`[StatsDashboard ${version}] Logged in as: ${session.user.email}`)
+            }
+
+            console.log(`[StatsDashboard ${version}] Querying data...`)
             const [listsRes, tasksRes, detailsRes] = await Promise.all([
                 supabase.from('lists').select('*'),
                 supabase.from('tasks').select('last_modifier, created_at, is_header, list_id'),
                 supabase.from('vue_details_listes').select('*')
             ])
 
-            console.log('Lists Response:', listsRes)
-            console.log('Tasks Response:', tasksRes)
-            console.log('Details View Response:', detailsRes)
-
             if (listsRes.error) console.error('Error fetching lists:', listsRes.error)
             if (tasksRes.error) console.error('Error fetching tasks:', tasksRes.error)
-            if (detailsRes.error) console.error('Error fetching details:', detailsRes.error)
+            if (detailsRes.error) {
+                console.error('Error fetching details:', detailsRes.error)
+                // If 400, maybe the view doesn't exist or column is wrong
+            }
 
             const lists = listsRes.data || []
             const tasks = tasksRes.data || []
             const details = detailsRes.data || []
+
+            console.log(`[StatsDashboard ${version}] Result counts: ${lists.length} lists, ${tasks.length} tasks, ${details.length} details`)
 
             // Aggregate Users from all sources
             const userMap = new Map() // email -> lastActivity (Date)
@@ -95,13 +104,14 @@ export default function StatsDashboard() {
             lists.forEach(list => {
                 const email = list.owner_email?.toLowerCase()
                 if (email && !userMap.has(email)) {
-                    userMap.set(email, new Date(0)) // Default to epoch if no activity
+                    userMap.set(email, new Date(0))
                 }
             })
 
-            // 3. From vue_details_listes
+            // 3. From details (vue_details_listes)
             details.forEach(item => {
-                const email = item.email?.toLowerCase()
+                // Try different common column names if 'email' is undefined
+                const email = (item.email || item.user_email || item.last_modifier)?.toLowerCase()
                 if (email && !userMap.has(email)) {
                     userMap.set(email, new Date(0))
                 }
