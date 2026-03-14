@@ -10,8 +10,7 @@ export default function StatsDashboard() {
     const [sortBy, setSortBy] = useState('date') // 'date' or 'alpha'
     const [stats, setStats] = useState({
         users: [],
-        lists: [],
-        shares: []
+        lists: []
     })
     const [loading, setLoading] = useState(true)
     const [deferredPrompt, setDeferredPrompt] = useState(null)
@@ -58,15 +57,15 @@ export default function StatsDashboard() {
                 return
             }
 
-            const [listsRes, tasksRes, sharesRes] = await Promise.all([
+            const [listsRes, tasksRes, detailsRes] = await Promise.all([
                 supabase.from('lists').select('*'),
                 supabase.from('tasks').select('last_modifier, created_at, is_header, list_id'),
-                supabase.from('shares').select('*')
+                supabase.from('vue_details_listes').select('email') // Assuming 'email' is the column name
             ])
 
             const lists = listsRes.data || []
             const tasks = tasksRes.data || []
-            const shares = sharesRes.data || []
+            const details = detailsRes.data || []
 
             // Aggregate Users from all sources
             const userMap = new Map() // email -> lastActivity (Date)
@@ -90,9 +89,9 @@ export default function StatsDashboard() {
                 }
             })
 
-            // 3. From Shares (Targets)
-            shares.forEach(share => {
-                const email = share.shared_with_email?.toLowerCase()
+            // 3. From vue_details_listes
+            details.forEach(item => {
+                const email = item.email?.toLowerCase()
                 if (email && !userMap.has(email)) {
                     userMap.set(email, new Date(0))
                 }
@@ -116,8 +115,7 @@ export default function StatsDashboard() {
 
             setStats({
                 users,
-                lists: lists.map(l => ({ ...l, itemCount: taskCounts.get(l.id) || 0 })),
-                shares
+                lists: lists.map(l => ({ ...l, itemCount: taskCounts.get(l.id) || 0 }))
             })
         } catch (error) {
             console.error('Critical error in fetchStats:', error)
@@ -147,8 +145,7 @@ export default function StatsDashboard() {
 
     const tabs = [
         { id: 'users', label: 'Emails', icon: Users, count: stats.users.length },
-        { id: 'lists', label: 'Listes', icon: List, count: stats.lists.length },
-        { id: 'shares', label: 'Partages', icon: Share2, count: stats.shares.length }
+        { id: 'lists', label: 'Listes', icon: List, count: stats.lists.length }
     ]
 
     if (!isAuthorized) {
@@ -260,16 +257,6 @@ export default function StatsDashboard() {
                                 </div>
                             ))}
 
-                            {activeTab === 'shares' && stats.shares.map((share, i) => (
-                                <div key={i} className="glass-panel" style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                    <div style={{ padding: '0.75rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '0.75rem', color: '#10b981' }}><Share2 size={20} /></div>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ fontWeight: 600 }}>De : {share.owner_email}</div>
-                                        <div style={{ fontWeight: 400, fontSize: '0.9rem' }}>Vers : {share.shared_with_email}</div>
-                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>List : {share.list_id}</div>
-                                    </div>
-                                </div>
-                            ))}
                         </motion.div>
                     </AnimatePresence>
                 )}
@@ -279,10 +266,14 @@ export default function StatsDashboard() {
                     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowAlreadyInstalled(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(2, 6, 23, 0.8)', backdropFilter: 'blur(8px)' }} />
                         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} style={{ position: 'relative', width: '100%', maxWidth: '340px', background: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '1.5rem', padding: '2rem', textAlign: 'center' }}>
-                            <ShieldCheck size={32} color="#10b981" style={{ margin: '0 auto 1rem' }} />
-                            <h2 style={{ fontSize: '1.25rem', color: '#f8fafc' }}>Déjà installée !</h2>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>L'application de statistiques est déjà installée.</p>
-                            <button onClick={() => setShowAlreadyInstalled(false)} style={{ marginTop: '1.5rem', width: '100%', padding: '0.8rem', borderRadius: '0.75rem', background: 'rgba(59, 130, 246, 0.1)', border: 'none', color: '#3b82f6', fontWeight: 600, cursor: 'pointer' }}>J'ai compris</button>
+                            <ShieldCheck size={32} color={deferredPrompt ? "#10b981" : "#3b82f6"} style={{ margin: '0 auto 1rem' }} />
+                            <h2 style={{ fontSize: '1.25rem', color: '#f8fafc' }}>{deferredPrompt ? "Déjà installée !" : "Installation Manuelle"}</h2>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+                                {deferredPrompt 
+                                    ? "L'application de statistiques est déjà installée sur votre appareil." 
+                                    : "L'installation automatique n'est pas disponible. Vous pouvez ajouter cette page à l'écran d'accueil via le menu de votre navigateur."}
+                            </p>
+                            <button onClick={() => setShowAlreadyInstalled(false)} style={{ marginTop: '1.5rem', width: '100%', padding: '0.8rem', borderRadius: '0.75rem', background: 'rgba(59, 130, 246, 0.1)', border: 'none', color: '#3b82f6', fontWeight: 600, cursor: 'pointer' }}>D'accord</button>
                         </motion.div>
                     </div>
                 )}

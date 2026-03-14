@@ -4,7 +4,7 @@
   "description": "Statistiques d'utilisation de OS List Manager.",
   "id": "os-stats-manager-v1",
   "start_url": "./stats.html",
-  "scope": "./",
+  "scope": "./stats.html",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#3b82f6",
