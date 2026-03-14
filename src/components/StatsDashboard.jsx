@@ -133,27 +133,6 @@ export default function StatsDashboard() {
                 users,
                 lists: lists.map(l => ({ ...l, itemCount: taskCounts.get(l.id) || 0 }))
             })
-
-            const users = Array.from(userMap.entries()).map(([email, lastMod]) => ({
-                email,
-                lastModDate: lastMod,
-                lastModText: lastMod.getTime() === 0 ? 'Aucune activité' : lastMod.toLocaleDateString('fr-FR', {
-                    day: '2-digit', month: '2-digit', year: 'numeric',
-                    hour: '2-digit', minute: '2-digit'
-                })
-            }))
-
-            const taskCounts = new Map()
-            tasks.forEach(task => {
-                if (!task.is_header) {
-                    taskCounts.set(task.list_id, (taskCounts.get(task.list_id) || 0) + 1)
-                }
-            })
-
-            setStats({
-                users,
-                lists: lists.map(l => ({ ...l, itemCount: taskCounts.get(l.id) || 0 }))
-            })
         } catch (error) {
             console.error('Critical error in fetchStats:', error)
         }
