@@ -80,42 +80,52 @@ export default function StatsDashboard() {
                 // If 400, maybe the view doesn't exist or column is wrong
             }
 
-            const lists = listsRes.data || []
-            const tasks = tasksRes.data || []
-            const details = detailsRes.data || []
-
             console.log(`[StatsDashboard ${version}] Result counts: ${lists.length} lists, ${tasks.length} tasks, ${details.length} details`)
+            console.log(`[StatsDashboard ${version}] Raw details sample:`, details.slice(0, 3))
 
             // Aggregate Users from all sources
             const userMap = new Map() // email -> lastActivity (Date)
 
             // 1. From Tasks
+            const taskEmails = new Set()
             tasks.forEach(task => {
                 const email = task.last_modifier?.toLowerCase()
                 if (email) {
+                    taskEmails.add(email)
                     const date = new Date(task.created_at)
                     if (!userMap.has(email) || date > userMap.get(email)) {
                         userMap.set(email, date)
                     }
                 }
             })
+            console.log(`[StatsDashboard ${version}] Unique emails from tasks:`, Array.from(taskEmails))
 
             // 2. From Lists (Owners)
+            const listEmails = new Set()
             lists.forEach(list => {
                 const email = list.owner_email?.toLowerCase()
-                if (email && !userMap.has(email)) {
-                    userMap.set(email, new Date(0))
+                if (email) {
+                    listEmails.add(email)
+                    if (!userMap.has(email)) {
+                        userMap.set(email, new Date(0))
+                    }
                 }
             })
+            console.log(`[StatsDashboard ${version}] Unique emails from lists:`, Array.from(listEmails))
 
             // 3. From details (vue_details_listes)
+            const detailEmails = new Set()
             details.forEach(item => {
-                // Try different common column names if 'email' is undefined
-                const email = (item.email || item.user_email || item.last_modifier)?.toLowerCase()
-                if (email && !userMap.has(email)) {
-                    userMap.set(email, new Date(0))
+                // Try different common column names
+                const email = (item.email || item.user_email || item.last_modifier || item.owner_email || item.shared_with_email)?.toLowerCase()
+                if (email) {
+                    detailEmails.add(email)
+                    if (!userMap.has(email)) {
+                        userMap.set(email, new Date(0))
+                    }
                 }
             })
+            console.log(`[StatsDashboard ${version}] Unique emails from details view:`, Array.from(detailEmails))
 
             const users = Array.from(userMap.entries()).map(([email, lastMod]) => ({
                 email,
