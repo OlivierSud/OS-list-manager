@@ -9,9 +9,20 @@
     <!-- Supabase Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/js/supabase-config.js"></script>
+    <link rel="stylesheet" href="css/style.css?v=5">
 </head>
-<body style="margin: 0; background-color: #020617; color: #f8fafc; font-family: 'Inter', sans-serif;">
+<body class="dark-theme">
     <div id="root"></div>
     <script type="module" src="/src/stats.jsx"></script>
+    <script>
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        if (savedTheme === 'light') {
+            document.body.classList.add('light-theme');
+            document.body.classList.remove('dark-theme');
+        } else {
+            document.body.classList.add('dark-theme');
+            document.body.classList.remove('light-theme');
+        }
+    </script>
 </body>
 </html>

@@ -1020,7 +1020,7 @@ function renderHome() {
 
         el.innerHTML = `
             <div onclick="openList('${list.id}')" style="display: flex; align-items: center; flex: 1;">
-                <div class="list-icon" style="background-color: ${list.color}">
+                <div class="list-icon" style="${list.color ? `background-color: ${list.color}; color: var(--text-on-accent);` : ''}">
                     <i data-lucide="list"></i>
                 </div>
                 <div>
@@ -1080,7 +1080,7 @@ function renderList(listId) {
     updateFilterButtonUI();
 
     // Update title with color badge
-    const colorBadge = `<span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: ${list.color}; margin-right: 0.5rem; border: 1px solid rgba(255,255,255,0.2);"></span>`;
+    const colorBadge = `<span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: ${list.color}; margin-right: 0.5rem; border: 1px solid var(--border-light);"></span>`;
     headerTitle.innerHTML = colorBadge + list.name;
 
     // Ensure refresh button stays visible in list view when user is signed in
@@ -1351,7 +1351,7 @@ function renderList(listId) {
                 el.dataset.index = index;
                 el.dataset.isHeader = 'false';
 
-                const checkIcon = item.done ? '<i data-lucide="check" style="width:24px; color: white;"></i>' : '';
+                const checkIcon = item.done ? '<i data-lucide="check" style="width:24px; color: var(--text-on-accent);"></i>' : '';
 
                 el.innerHTML = `
                     <span class="drag-handle"></span>
@@ -1653,7 +1653,7 @@ function toggleHeaderModeState() {
     state.isHeaderMode = !state.isHeaderMode;
     if (state.isHeaderMode) {
         toggleHeaderMode.style.color = 'var(--accent-color)';
-        toggleHeaderMode.style.background = 'rgba(59, 130, 246, 0.1)';
+        toggleHeaderMode.style.background = 'var(--accent-glow)';
         newTaskInput.placeholder = "Titre de section...";
     } else {
         toggleHeaderMode.style.color = 'var(--text-secondary)';
