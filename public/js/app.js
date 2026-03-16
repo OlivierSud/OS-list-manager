@@ -309,11 +309,15 @@ async function fetchSupabaseData() {
 
     console.log("Fetching Supabase data...");
     try {
-        // 1. Fetch Lists
         // 1. Fetch My Lists
+        const currentUserEmail = (state.userEmail || "").toLowerCase();
+        
+        // We fetch lists where I am the owner (by email or ID)
+        const { data: { user } } = await supabaseClient.auth.getUser();
         const { data: myLists, error: listsError } = await supabaseClient
             .from('lists')
             .select('*')
+            .or(`owner_email.eq.${currentUserEmail}${user ? `,owner_id.eq.${user.id}` : ''}`)
             .order('created_at', { ascending: true });
 
         if (listsError) throw listsError;
@@ -329,7 +333,6 @@ async function fetchSupabaseData() {
         }
 
         // 2. Fetch Shares (both directions)
-        const currentUserEmail = (state.userEmail || "").toLowerCase();
         const { data: incomingShares } = await supabaseClient
             .from('shares')
             .select('list_id')

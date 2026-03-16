@@ -115,9 +115,25 @@ export default function StatsDashboard() {
 
             // 3. From details (vue_details_listes)
             details.forEach(item => {
-                const email = (item.email || item.user_email || item.last_modifier || item.proprietaire || item.Propriétaire || item.owner_email)?.toLowerCase()
-                if (email && !userMap.has(email)) {
-                    userMap.set(email, new Date(0))
+                // Owner email
+                const owner = (item.Propriétaire || item.proprietaire || item.owner_email || item.email || item.user_email || item.last_modifier)?.toLowerCase()
+                if (owner && !userMap.has(owner)) {
+                    userMap.set(owner, new Date(0))
+                }
+
+                // Shared emails (can be multiple)
+                const sharedValue = item['partagée avec'] || item['partagé avec'] || item.shared_with || item.partage
+                if (sharedValue) {
+                    const sharedEmails = typeof sharedValue === 'string' 
+                        ? sharedValue.split(/[,\s;]+/).filter(e => e.includes('@')) 
+                        : [sharedValue]
+                    
+                    sharedEmails.forEach(e => {
+                        const cleanE = e.toString().trim().toLowerCase()
+                        if (cleanE && !userMap.has(cleanE)) {
+                            userMap.set(cleanE, new Date(0))
+                        }
+                    })
                 }
             })
 
