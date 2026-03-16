@@ -75,26 +75,28 @@ export default function StatsDashboard() {
                 return
             }
 
-            const [listsRes, tasksRes, detailsRes] = await Promise.all([
+            const [listsRes, tasksRes, detailsRes, sharesRes] = await Promise.all([
                 supabase.from('lists').select('*'),
                 supabase.from('tasks').select('last_modifier, created_at, is_header, list_id'),
-                supabase.from('vue_details_listes').select('*')
+                supabase.from('vue_details_listes').select('*'),
+                supabase.from('shares').select('shared_with_email')
             ])
 
             if (listsRes.error) console.error('Error fetching lists:', listsRes.error)
             if (tasksRes.error) console.error('Error fetching tasks:', tasksRes.error)
+            if (sharesRes.error) console.error('Error fetching shares:', sharesRes.error)
             if (detailsRes.error) {
                 console.error('Error fetching details:', detailsRes.error)
-                // If 400, maybe the view doesn't exist or column is wrong
             }
             const lists = listsRes.data || []
             const tasks = tasksRes.data || []
             const details = detailsRes.data || []
+            const sharesFromTable = sharesRes.data || []
 
             // Aggregate Users from all sources
             const userMap = new Map() // email -> lastActivity (Date)
 
-            // 1. From Tasks
+            // 1. From Tasks (Activity)
             tasks.forEach(task => {
                 const email = task.last_modifier?.toLowerCase()
                 if (email) {
@@ -107,34 +109,42 @@ export default function StatsDashboard() {
 
             // 2. From Lists (Owners)
             lists.forEach(list => {
-                const email = (list.owner_email || list.proprietaire || list.Propriétaire)?.toLowerCase()
+                const email = (list.owner_email || list.proprietaire || list.Propriétaire || list.owner_id)?.toLowerCase()
+                if (email && email.includes('@') && !userMap.has(email)) {
+                    userMap.set(email, new Date(0))
+                }
+            })
+
+            // 3. From Shares table (Collaborators)
+            sharesFromTable.forEach(s => {
+                const email = s.shared_with_email?.toLowerCase()
                 if (email && !userMap.has(email)) {
                     userMap.set(email, new Date(0))
                 }
             })
 
-            // 3. From details (vue_details_listes)
+            // 4. From details view (Safety check)
             details.forEach(item => {
-                // Owner email
-                const owner = (item.Propriétaire || item.proprietaire || item.owner_email || item.email || item.user_email || item.last_modifier)?.toLowerCase()
-                if (owner && !userMap.has(owner)) {
-                    userMap.set(owner, new Date(0))
-                }
+                // Check all possible column variations for emails in the view
+                const possibleEmails = [
+                    item.Propriétaire, item.proprietaire, item.owner_email,
+                    item['partagée avec'], item['partagé avec'], item.shared_with,
+                    item.email, item.user_email
+                ]
 
-                // Shared emails (can be multiple)
-                const sharedValue = item['partagée avec'] || item['partagé avec'] || item.shared_with || item.partage
-                if (sharedValue) {
-                    const sharedEmails = typeof sharedValue === 'string' 
-                        ? sharedValue.split(/[,\s;]+/).filter(e => e.includes('@')) 
-                        : [sharedValue]
+                possibleEmails.forEach(val => {
+                    if (!val) return
+                    const emails = typeof val === 'string' 
+                        ? val.split(/[,\s;]+/).filter(e => e.includes('@')) 
+                        : [val.toString()]
                     
-                    sharedEmails.forEach(e => {
-                        const cleanE = e.toString().trim().toLowerCase()
+                    emails.forEach(e => {
+                        const cleanE = e.trim().toLowerCase()
                         if (cleanE && !userMap.has(cleanE)) {
                             userMap.set(cleanE, new Date(0))
                         }
                     })
-                }
+                })
             })
 
             const users = Array.from(userMap.entries()).map(([email, lastMod]) => ({
@@ -146,6 +156,13 @@ export default function StatsDashboard() {
                 })
             }))
 
+            // Merge details info into lists for the UI
+            const detailsMap = new Map()
+            details.forEach(d => {
+                const id = d.id || d.list_id
+                if (id) detailsMap.set(id, d)
+            })
+
             const taskCounts = new Map()
             tasks.forEach(task => {
                 if (!task.is_header) {
@@ -155,7 +172,14 @@ export default function StatsDashboard() {
 
             setStats({
                 users,
-                lists: lists.map(l => ({ ...l, itemCount: taskCounts.get(l.id) || 0 }))
+                lists: lists.map(l => {
+                    const detail = detailsMap.get(l.id)
+                    return { 
+                        ...l, 
+                        itemCount: taskCounts.get(l.id) || 0,
+                        sharedWith: detail ? (detail['partagée avec'] || detail['partagé avec'] || detail.shared_with || detail.partage) : null
+                    }
+                })
             })
         } catch (error) {
             console.error('Critical error in fetchStats:', error)
@@ -314,7 +338,12 @@ export default function StatsDashboard() {
                                     <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: list.color || '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}><List size={20} /></div>
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontWeight: 600 }}>{list.name}</div>
-                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Propriétaire : {list.owner_email}</div>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Propriétaire : {list.owner_email || list.proprietaire || list.Propriétaire}</div>
+                                        {list.sharedWith && (
+                                            <div style={{ fontSize: '0.75rem', color: '#3b82f6', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                                <Share2 size={12} /> Partagée avec : {list.sharedWith}
+                                            </div>
+                                        )}
                                     </div>
                                     <div style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: '0.25rem 0.75rem', borderRadius: '1rem', fontSize: '0.85rem', fontWeight: 600 }}>{list.itemCount} éléments</div>
                                 </div>
