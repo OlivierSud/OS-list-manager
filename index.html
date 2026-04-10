@@ -24,7 +24,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- Styles -->
-  <link rel="stylesheet" href="css/style.css?v=6">
+  <link rel="stylesheet" href="css/style.css?v=7">
 </head>
 
 <body>
@@ -148,19 +148,7 @@
       <i data-lucide="plus" style="width: 32px; height: 32px;"></i>
     </button>
 
-    <!-- Add Task Input (Only visible in Task View) -->
-    <div id="task-input-container" class="input-bar hidden glass-panel task-input-bar">
 
-      <button id="toggle-header-mode" class="btn-icon header-mode-toggle">
-        <i data-lucide="list"></i>
-        <i data-lucide="plus" class="mini-plus"></i>
-      </button>
-
-      <input type="text" id="new-task-input" placeholder="Ajouter un élément..." class="input-field task-input">
-      <button id="add-task-button" class="btn-send">
-        <i data-lucide="plus"></i>
-      </button>
-    </div>
 
     <!-- Action Sheet / Modal -->
     <div id="action-modal" class="hidden modal-overlay">
@@ -250,8 +238,22 @@
 
   </div>
 
+  <!-- Add Task Input (Moved outside of #app to ensure absolute viewport fixed positioning) -->
+  <div id="task-input-container" class="input-bar hidden glass-panel task-input-bar">
+
+    <button id="toggle-header-mode" class="btn-icon header-mode-toggle">
+      <i data-lucide="list"></i>
+      <i data-lucide="plus" class="mini-plus"></i>
+    </button>
+
+    <input type="text" id="new-task-input" placeholder="Ajouter un élément..." class="input-field task-input">
+    <button id="add-task-button" class="btn-send">
+      <i data-lucide="plus"></i>
+    </button>
+  </div>
+
   <script src="js/supabase-config.js"></script>
-  <script src="js/app.js?v=59"></script>
+  <script src="js/app.js?v=60"></script>
   <script>
     // Initialize Lucide Icons after load
     document.addEventListener("DOMContentLoaded", function () {
