@@ -878,19 +878,22 @@ h1 {
     cursor: grab;
     color: var(--text-secondary);
     padding: 0;
-    margin-right: 0.25rem;
+    margin-right: 0.75rem;
     opacity: 0.5;
-    transition: opacity 0.2s;
+    transition: all 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 0;
-    margin-right: 0;
+    width: 14px;
     height: 32px;
     box-sizing: border-box;
     flex-shrink: 0;
     touch-action: none;
     /* Prevent scroll when dragging handle */
+    background-image: radial-gradient(circle, var(--text-secondary) 1.2px, transparent 1.2px);
+    background-size: 4px 4px;
+    background-repeat: repeat;
+    background-position: center;
 }
 
 .drag-handle:hover {

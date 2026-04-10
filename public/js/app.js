@@ -318,7 +318,7 @@ async function fetchSupabaseData() {
             .from('lists')
             .select('*')
             .or(`owner_email.eq.${currentUserEmail}${user ? `,owner_id.eq.${user.id}` : ''}`)
-            .order('created_at', { ascending: true });
+            .order('position', { ascending: true });
 
         if (listsError) throw listsError;
 
@@ -634,6 +634,24 @@ async function syncOrderToSheet(listId) {
         if (error) throw error;
     } catch (e) {
         console.error("Sync error:", e);
+    }
+}
+
+async function syncListsOrderToSupabase() {
+    if (!state.userEmail) return;
+    
+    // We update the position for each list in the current state.lists array
+    // Optimization: we could check which ones changed but for usually small list sets, individual updates are fine
+    for (let i = 0; i < state.lists.length; i++) {
+        const list = state.lists[i];
+        try {
+            await supabaseClient
+                .from('lists')
+                .update({ position: i })
+                .eq('id', list.id);
+        } catch (e) {
+            console.error("Error updating list position:", e);
+        }
     }
 }
 
@@ -1010,15 +1028,17 @@ function renderHome() {
         listsContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 2rem;">Chargement...</div>`;
     }
 
-    state.lists.forEach(list => {
+    state.lists.forEach((list, index) => {
         const listItems = state.items[list.id] || [];
         const itemCount = listItems.filter(i => !i.isHeader).length;
 
         const el = document.createElement('div');
         el.className = 'glass-panel list-item';
-        // Remove global onclick, move to inner div
+        el.draggable = true;
+        el.dataset.index = index;
 
         el.innerHTML = `
+            <span class="drag-handle"></span>
             <div onclick="openList('${list.id}')" style="display: flex; align-items: center; flex: 1;">
                 <div class="list-icon" style="${list.color ? `background-color: ${list.color}; color: var(--text-on-accent);` : ''}">
                     <i data-lucide="list"></i>
@@ -1035,6 +1055,7 @@ function renderHome() {
                 <i data-lucide="more-vertical"></i>
             </button>
         `;
+        setupListDragHandlers(el, index);
         listsContainer.appendChild(el);
     });
 
@@ -2159,6 +2180,112 @@ function setupBoundaryDragHandlers(element, position) {
     });
 }
 
+function setupListDragHandlers(element, index) {
+    if (!element) return;
+
+    element.addEventListener('dragstart', (e) => {
+        draggedElement = element;
+        draggedIndex = index;
+        setTimeout(() => element.classList.add('dragging'), 0);
+        if (listsContainer) listsContainer.classList.add('dragging-active');
+        
+        if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = 'move';
+            if (_blankDragImage) e.dataTransfer.setDragImage(_blankDragImage, 0, 0);
+        }
+    });
+
+    element.addEventListener('dragend', () => {
+        element.classList.remove('dragging');
+        if (listsContainer) listsContainer.classList.remove('dragging-active');
+        draggedElement = null;
+        draggedIndex = null;
+        document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
+            el.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+        stopAutoScroll();
+    });
+
+    element.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        handleAutoScrollDuringDrag(e);
+        
+        if (draggedElement !== element) {
+            const rect = element.getBoundingClientRect();
+            const relY = e.clientY - rect.top;
+            const isTop = relY < (rect.height / 2);
+            
+            element.classList.remove('drag-over-top', 'drag-over-bottom');
+            if (isTop) {
+                element.classList.add('drag-over-top');
+            } else {
+                element.classList.add('drag-over-bottom');
+            }
+        }
+    });
+
+    element.addEventListener('dragleave', () => {
+        element.classList.remove('drag-over-top', 'drag-over-bottom');
+        stopAutoScroll();
+    });
+
+    element.addEventListener('drop', (e) => {
+        e.preventDefault();
+        element.classList.remove('drag-over-top', 'drag-over-bottom');
+        stopAutoScroll();
+        
+        if (!draggedElement || draggedElement === element) return;
+        
+        const rect = element.getBoundingClientRect();
+        const relY = e.clientY - rect.top;
+        const insertAfter = relY >= (rect.height / 2);
+        
+        const dropIndex = parseInt(element.dataset.index);
+        const dragIndex = draggedIndex;
+        
+        const lists = [...state.lists];
+        const movedList = lists[dragIndex];
+        
+        // Use the common logic for actual array reordering
+        lists.splice(dragIndex, 1);
+        let targetIndex = dropIndex;
+        if (insertAfter) targetIndex++;
+        if (dragIndex < targetIndex) targetIndex--;
+        
+        lists.splice(targetIndex, 0, movedList);
+        
+        state.lists = lists;
+        renderHome();
+        syncListsOrderToSupabase();
+    });
+
+    // Touch support (handle drag start immediately on handle)
+    try {
+        const handle = element.querySelector('.drag-handle');
+        if (handle) {
+            handle.addEventListener('touchstart', (e) => {
+                if (!e.touches || !e.touches[0]) return;
+                const t = e.touches[0];
+                touchStartX = t.clientX; touchStartY = t.clientY;
+                e.stopPropagation();
+                // e.preventDefault(); // removed to keep native click/scroll possible, beginDrag handles the rest
+                if ("vibrate" in navigator) navigator.vibrate(50);
+                beginDragFromTarget(handle);
+            }, { passive: true });
+
+            handle.addEventListener('pointerdown', (e) => {
+                if (e.pointerType === 'touch') {
+                    touchStartX = e.clientX; touchStartY = e.clientY;
+                    e.stopPropagation();
+                    if ("vibrate" in navigator) navigator.vibrate(50);
+                    beginDragFromTarget(handle);
+                }
+            }, { passive: false });
+        }
+    } catch (e) {}
+}
+
 // function syncOrderToSheet(listId) { /* Removed logic handled by Supabase syncOrderToSheet above */ }
 
 // --- Event Listeners ---
@@ -2448,7 +2575,8 @@ window.onload = function () {
             draggedIndex = parseInt(el.dataset.index);
             touchDragging = true;
             el.classList.add('dragging');
-            if (tasksContainer) tasksContainer.classList.add('dragging-active');
+            if (tasksContainer && state.view === 'list') tasksContainer.classList.add('dragging-active');
+            if (listsContainer && state.view === 'home') listsContainer.classList.add('dragging-active');
             try { if (tasksContainer) tasksContainer.style.touchAction = 'none'; } catch (err) { }
             // create floating ghost to follow finger for better UX on mobile
             try { createTouchGhost(el, touchStartX, touchStartY); } catch (e) { }
@@ -2558,10 +2686,37 @@ window.onload = function () {
         }
 
         if (!currentTouchDrop) {
-            // final fallback: drop at end of list
-            const listId = state.activeListId;
-            if (listId === null || listId === undefined) return;
-            currentTouchDrop = { type: 'spacer', index: (state.items[listId] || []).length, element: null };
+            // final fallback: drop at end of list/set
+            if (state.view === 'home') {
+                currentTouchDrop = { type: 'item', index: state.lists.length - 1, element: null, insertAfter: true };
+            } else {
+                const listId = state.activeListId;
+                if (listId === null || listId === undefined) return;
+                currentTouchDrop = { type: 'spacer', index: (state.items[listId] || []).length, element: null };
+            }
+        }
+
+        if (state.view === 'home') {
+            const lists = [...state.lists];
+            const dragIndex = draggedIndex;
+            if (dragIndex === null || dragIndex === undefined) return;
+            
+            const movedList = lists[dragIndex];
+            lists.splice(dragIndex, 1);
+            
+            let targetIndex = currentTouchDrop.index;
+            if (currentTouchDrop.insertAfter) targetIndex++;
+            if (dragIndex < targetIndex) targetIndex--;
+            
+            lists.splice(targetIndex, 0, movedList);
+            state.lists = lists;
+            renderHome();
+            syncListsOrderToSupabase();
+            clearTouchIndicator();
+            touchDragging = false;
+            draggedElement = null;
+            draggedIndex = null;
+            return;
         }
 
         try { console.log('performTouchDrop resolved target', currentTouchDrop, 'draggedIndex=', draggedIndex); } catch (e) { }
@@ -2721,6 +2876,7 @@ window.onload = function () {
         stopAutoScroll();
         if (draggedElement) draggedElement.classList.remove('dragging');
         if (tasksContainer) tasksContainer.classList.remove('dragging-active');
+        if (listsContainer) listsContainer.classList.remove('dragging-active');
         try { if (tasksContainer) tasksContainer.style.touchAction = 'auto'; } catch (err) { }
         try { clearTouchGhost(); } catch (e) { }
         draggedElement = null;
