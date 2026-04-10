@@ -318,9 +318,22 @@ async function fetchSupabaseData() {
             .from('lists')
             .select('*')
             .or(`owner_email.eq.${currentUserEmail}${user ? `,owner_id.eq.${user.id}` : ''}`)
-            .order('position', { ascending: true });
+            .order('created_at', { ascending: true });
 
         if (listsError) throw listsError;
+
+        // Perform in-memory sort by position if the column exists among data
+        if (myLists && myLists.length > 0) {
+            myLists.sort((a, b) => {
+                // If both have position, use it
+                if (a.position !== undefined && a.position !== null && 
+                    b.position !== undefined && b.position !== null) {
+                    return a.position - b.position;
+                }
+                // Fallback to created_at
+                return new Date(a.created_at) - new Date(b.created_at);
+            });
+        }
 
         // --- REPARATION AUTOMATIQUE ---
         // Si je suis propriétaire d'une liste et que mon email n'est pas dedans, je le mets à jour
@@ -645,10 +658,15 @@ async function syncListsOrderToSupabase() {
     for (let i = 0; i < state.lists.length; i++) {
         const list = state.lists[i];
         try {
-            await supabaseClient
+            const { error } = await supabaseClient
                 .from('lists')
                 .update({ position: i })
                 .eq('id', list.id);
+            
+            if (error && error.message.includes('column "position"')) {
+                console.warn("La colonne 'position' n'existe pas dans la table 'lists'. Le tri ne sera pas persisté côté serveur.");
+                break; // Stop trying to avoid spamming errors
+            }
         } catch (e) {
             console.error("Error updating list position:", e);
         }
