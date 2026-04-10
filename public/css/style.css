@@ -174,8 +174,10 @@ header {
 .input-bar {
     position: fixed;
     bottom: 0;
-    left: 0;
-    right: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 2rem);
+    max-width: calc(600px - 2rem);
     background: var(--bg-glass);
     backdrop-filter: blur(12px);
     border-top: 1px solid var(--border-color);
@@ -284,8 +286,8 @@ main {
 
     to {
         opacity: 1;
-        transform: translateY(0) scale(1);
-        filter: blur(0);
+        transform: none;
+        filter: none;
     }
 }
 
@@ -1455,7 +1457,7 @@ input:checked+.slider .icon-moon {
 
 /* Task Input Bar */
 .task-input-bar {
-    padding: 0.5rem !important;
+    padding: 0.5rem 0.5rem calc(0.5rem + env(safe-area-inset-bottom)) 0.5rem !important;
     background: var(--bg-glass) !important;
 }
 
