@@ -335,6 +335,21 @@ async function fetchSupabaseData() {
             });
         }
 
+        // Apply LocalStorage override for ordering if column is missing in DB
+        try {
+            const savedOrder = JSON.parse(localStorage.getItem('os_lists_order'));
+            if (savedOrder && Array.isArray(savedOrder) && myLists) {
+                myLists.sort((a, b) => {
+                    const idxA = savedOrder.indexOf(a.id);
+                    const idxB = savedOrder.indexOf(b.id);
+                    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                    if (idxA !== -1) return -1;
+                    if (idxB !== -1) return 1;
+                    return 0; // fallback to current order
+                });
+            }
+        } catch (e) { console.warn("Failed to apply local order", e); }
+
         // --- REPARATION AUTOMATIQUE ---
         // Si je suis propriétaire d'une liste et que mon email n'est pas dedans, je le mets à jour
         if (myLists && state.userEmail) {
@@ -671,6 +686,12 @@ async function syncListsOrderToSupabase() {
             console.error("Error updating list position:", e);
         }
     }
+
+    // Always save to localStorage as a robust fallback for this device
+    try {
+        const orderIds = state.lists.map(l => l.id);
+        localStorage.setItem('os_lists_order', JSON.stringify(orderIds));
+    } catch (e) { }
 }
 
 async function deleteListItemInSupabase(listId, itemId) {
