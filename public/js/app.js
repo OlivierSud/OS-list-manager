@@ -707,31 +707,36 @@ async function deleteListItemInSupabase(listId, itemId) {
 }
 
 async function deleteListInSupabase(listId) {
-    if (!state.userEmail) return;
+    console.log('[deleteList] listId:', listId, '| userEmail:', state.userEmail);
+    if (!state.userEmail) { console.warn('[deleteList] Annulé: pas de userEmail'); return; }
+    if (!listId) { console.warn('[deleteList] Annulé: listId est null'); return; }
     try {
         // 1. Supprimer toutes les tâches liées à cette liste
         const { error: tasksError } = await supabaseClient
             .from('tasks')
             .delete()
             .eq('list_id', listId);
-        if (tasksError) throw tasksError;
+        if (tasksError) { console.error('[deleteList] Erreur tasks:', tasksError); throw tasksError; }
+        console.log('[deleteList] Tasks OK');
 
         // 2. Supprimer tous les partages liés à cette liste
         const { error: sharesError } = await supabaseClient
             .from('shares')
             .delete()
             .eq('list_id', listId);
-        if (sharesError) throw sharesError;
+        if (sharesError) { console.error('[deleteList] Erreur shares:', sharesError); throw sharesError; }
+        console.log('[deleteList] Shares OK');
 
         // 3. Supprimer la liste elle-même
         const { error: listError } = await supabaseClient
             .from('lists')
             .delete()
             .eq('id', listId);
-        if (listError) throw listError;
+        if (listError) { console.error('[deleteList] Erreur liste:', listError); throw listError; }
+        console.log('[deleteList] Liste supprimée, rafraîchissement...');
 
         fetchSupabaseData();
-    } catch (e) { console.error('Erreur lors de la suppression de la liste:', e); }
+    } catch (e) { console.error('[deleteList] EXCEPTION:', e); alert('Erreur suppression: ' + (e.message || JSON.stringify(e))); }
 }
 
 async function renameListInSupabase(listId, newName) {
@@ -2400,9 +2405,10 @@ if (btnDuplicate) btnDuplicate.onclick = () => {
 };
 
 if (btnDelete) btnDelete.onclick = () => {
+    const listIdToDelete = currentListId; // capture avant que closeOptions() ne le remette à null
     if (confirm("Voulez-vous vraiment supprimer cette liste ? Cette action est irréversible.")) {
-        deleteListInSupabase(currentListId);
         closeOptions();
+        deleteListInSupabase(listIdToDelete);
     }
 };
 
