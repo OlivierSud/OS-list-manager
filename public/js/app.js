@@ -2508,11 +2508,37 @@ async function parseImportFile(file) {
     return null;
 }
 
+// Regroupe les lignes par section (ordre de première apparition).
+// Les sections identiques sont fusionnées même si elles sont dispersées dans le fichier.
+function groupRowsBySection(rows) {
+    const sectionOrder = [];   // sections dans l'ordre de première apparition
+    const grouped = {};        // section → [taches]
+
+    rows.forEach(row => {
+        const key = row.section || '';
+        if (!grouped[key]) {
+            grouped[key] = [];
+            sectionOrder.push(key);
+        }
+        grouped[key].push(row.tache);
+    });
+
+    // Reconstruire un tableau plat ordonné
+    const result = [];
+    sectionOrder.forEach(section => {
+        grouped[section].forEach(tache => {
+            result.push({ section, tache });
+        });
+    });
+    return result;
+}
+
 function renderImportPreview(rows) {
     if (!rows || !importPreviewStats || !importPreviewList || !importPreview) return;
 
-    const sectionNames = [...new Set(rows.filter(r => r.section).map(r => r.section))];
-    const taskCount = rows.length;
+    const grouped = groupRowsBySection(rows);
+    const sectionNames = [...new Set(grouped.filter(r => r.section).map(r => r.section))];
+    const taskCount = grouped.length;
     const sectionCount = sectionNames.length;
 
     importPreviewStats.innerHTML =
@@ -2521,7 +2547,7 @@ function renderImportPreview(rows) {
 
     importPreviewList.innerHTML = '';
     let lastSection = null;
-    rows.forEach(row => {
+    grouped.forEach(row => {
         if (row.section && row.section !== lastSection) {
             lastSection = row.section;
             const el = document.createElement('div');
@@ -2570,7 +2596,9 @@ async function handleImportFile(file) {
 async function importRowsToList(listId, rows) {
     if (!listId || !rows || rows.length === 0) return;
 
-    // Build ordered list of items: group by section preserving order of appearance
+    // Regrouper les sections identiques avant insertion
+    const grouped = groupRowsBySection(rows);
+
     const existingItems = state.items[listId] || [];
     const startPosition = existingItems.length;
 
@@ -2578,8 +2606,8 @@ async function importRowsToList(listId, rows) {
     let position = startPosition;
     let lastSection = null;
 
-    rows.forEach(row => {
-        // Insert section header if section changes
+    grouped.forEach(row => {
+        // Insert section header only when section changes
         if (row.section && row.section !== lastSection) {
             lastSection = row.section;
             itemsToInsert.push({
