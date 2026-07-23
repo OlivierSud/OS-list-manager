@@ -84,6 +84,21 @@ function App() {
         setNewItemText('')
     }
 
+    const COLORS = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4']
+
+    const createNewList = () => {
+        const name = prompt('Nom de la nouvelle liste :')
+        if (!name || !name.trim()) return
+        const newList = {
+            id: Date.now(),
+            name: name.trim(),
+            color: COLORS[Math.floor(Math.random() * COLORS.length)],
+            items: 0
+        }
+        setLists(prev => [...prev, newList])
+        setItems(prev => ({ ...prev, [newList.id]: [] }))
+    }
+
     const activeListData = lists.find(l => l.id === activeListId)
 
     return (
@@ -248,6 +263,7 @@ function App() {
             {view === 'home' && (
                 <button
                     className="btn"
+                    onClick={createNewList}
                     style={{
                         position: 'fixed', bottom: '2rem', right: '2rem',
                         width: '64px', height: '64px', borderRadius: '50%', padding: 0,

@@ -709,13 +709,29 @@ async function deleteListItemInSupabase(listId, itemId) {
 async function deleteListInSupabase(listId) {
     if (!state.userEmail) return;
     try {
-        const { error } = await supabaseClient
+        // 1. Supprimer toutes les tâches liées à cette liste
+        const { error: tasksError } = await supabaseClient
+            .from('tasks')
+            .delete()
+            .eq('list_id', listId);
+        if (tasksError) throw tasksError;
+
+        // 2. Supprimer tous les partages liés à cette liste
+        const { error: sharesError } = await supabaseClient
+            .from('shares')
+            .delete()
+            .eq('list_id', listId);
+        if (sharesError) throw sharesError;
+
+        // 3. Supprimer la liste elle-même
+        const { error: listError } = await supabaseClient
             .from('lists')
             .delete()
             .eq('id', listId);
-        if (error) throw error;
+        if (listError) throw listError;
+
         fetchSupabaseData();
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error('Erreur lors de la suppression de la liste:', e); }
 }
 
 async function renameListInSupabase(listId, newName) {
