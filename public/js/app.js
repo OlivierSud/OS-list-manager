@@ -2604,29 +2604,36 @@ async function importRowsToList(listId, rows) {
 
     const itemsToInsert = [];
     let position = startPosition;
-    let lastSection = null;
+    let currentHeaderId = null;   // UUID du header courant
+    let lastSectionText = null;   // texte de la dernière section insérée
 
     grouped.forEach(row => {
-        // Insert section header only when section changes
-        if (row.section && row.section !== lastSection) {
-            lastSection = row.section;
+        // Nouveau header si la section change
+        if (row.section && row.section !== lastSectionText) {
+            lastSectionText = row.section;
+            currentHeaderId = generateId();
             itemsToInsert.push({
+                id: currentHeaderId,
                 list_id: listId,
                 text: row.section,
                 done: false,
                 is_header: true,
                 is_sub_header: false,
+                parent_id: null,
                 position: position++,
                 last_modifier: state.userEmail
             });
         }
-        // Insert task
+
+        // Tâche — liée au header courant via parent_id
         itemsToInsert.push({
+            id: generateId(),
             list_id: listId,
             text: row.tache,
             done: false,
             is_header: false,
             is_sub_header: false,
+            parent_id: row.section ? currentHeaderId : null,
             position: position++,
             last_modifier: state.userEmail
         });
@@ -2640,7 +2647,7 @@ async function importRowsToList(listId, rows) {
 
         closeImportModal();
         await fetchSupabaseData();
-        // Navigate to the list to show the result
+        // Naviguer vers la liste pour voir le résultat
         if (state.view !== 'list' || state.activeListId !== listId) {
             openList(listId);
         }
