@@ -1121,6 +1121,9 @@ function renderList(listId) {
     const list = state.lists.find(l => l.id === listId);
     if (!list) return;
 
+    // Save scroll position before clearing content to restore after re-render
+    const savedScrollTop = tasksContainer ? tasksContainer.scrollTop : 0;
+
     // Hide/Show elements
     listsContainer.classList.add('hidden');
 
@@ -1456,6 +1459,11 @@ function renderList(listId) {
     }
 
     lucide.createIcons();
+
+    // Restore scroll position after re-render
+    if (tasksContainer && savedScrollTop > 0) {
+        tasksContainer.scrollTop = savedScrollTop;
+    }
 }
 
 // --- Logic Functions ---
