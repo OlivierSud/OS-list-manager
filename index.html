@@ -24,7 +24,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- Styles -->
-  <link rel="stylesheet" href="css/style.css?v=9">
+  <link rel="stylesheet" href="css/style.css?v=10">
 </head>
 
 <body>
@@ -170,6 +170,10 @@
             <i data-lucide="palette"></i> Couleur
           </button>
 
+          <button id="btn-import" class="btn-icon modal-btn">
+            <i data-lucide="upload"></i> Importer data
+          </button>
+
           <button id="btn-delete" class="btn-icon modal-btn danger">
             <i data-lucide="trash-2"></i> Supprimer
           </button>
@@ -233,6 +237,39 @@
       </div>
     </div>
 
+    <!-- Import Modal -->
+    <div id="import-modal" class="hidden modal-overlay z-top">
+      <div class="glass-panel modal-content medium">
+        <h2 class="modal-title-large">Importer des données</h2>
+        <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">
+          Formats acceptés : <strong>.csv</strong> (Google Sheets) ou <strong>.xlsx</strong> (Excel).<br>
+          Colonnes requises : <code>tache</code> et (optionnel) <code>section</code>.
+        </p>
+
+        <!-- Drop Zone -->
+        <label id="import-drop-zone" class="import-drop-zone" for="import-file-input">
+          <i data-lucide="upload-cloud" style="width:40px;height:40px;color:var(--accent-color);"></i>
+          <span id="import-drop-label">Glissez un fichier ici<br><small>ou cliquez pour parcourir</small></span>
+          <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv" style="display:none;">
+        </label>
+
+        <!-- Preview -->
+        <div id="import-preview" class="import-preview hidden">
+          <div id="import-preview-stats" class="import-preview-stats"></div>
+          <div id="import-preview-list" class="import-preview-list"></div>
+        </div>
+
+        <div style="display:flex;gap:0.75rem;margin-top:1rem;">
+          <button id="btn-import-confirm" class="btn-send" style="flex:1;" disabled>
+            <i data-lucide="check"></i> Importer
+          </button>
+          <button id="btn-import-cancel" class="btn-icon modal-btn cancel" style="flex:1;">
+            Annuler
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- Floating Action Button (New List) - Moved outside of #app for fixed positioning -->
@@ -255,7 +292,7 @@
   </div>
 
   <script src="js/supabase-config.js"></script>
-  <script src="js/app.js?v=63"></script>
+  <script src="js/app.js?v=64"></script>
   <script>
     // Initialize Lucide Icons after load
     document.addEventListener("DOMContentLoaded", function () {

@@ -25,6 +25,7 @@ const btnDelete = document.getElementById('btn-delete');
 const btnLogout = document.getElementById('btn-logout');
 const btnCancel = document.getElementById('btn-cancel');
 const btnColor = document.getElementById('btn-color');
+const btnImport = document.getElementById('btn-import');
 const btnShare = document.getElementById('btn-share');
 const colorModal = document.getElementById('color-modal');
 const colorGrid = document.getElementById('color-grid');
@@ -38,6 +39,17 @@ const headerTitleRow = document.getElementById('header-title-row');
 const btnCheckAll = document.getElementById('btn-check-all');
 const btnUncheckAll = document.getElementById('btn-uncheck-all');
 const listActionsRow = document.getElementById('list-actions-row');
+// Import Modal Elements
+const importModal = document.getElementById('import-modal');
+const importFileInput = document.getElementById('import-file-input');
+const importDropZone = document.getElementById('import-drop-zone');
+const importPreview = document.getElementById('import-preview');
+const importPreviewStats = document.getElementById('import-preview-stats');
+const importPreviewList = document.getElementById('import-preview-list');
+const btnImportConfirm = document.getElementById('btn-import-confirm');
+const btnImportCancel = document.getElementById('btn-import-cancel');
+const importDropLabel = document.getElementById('import-drop-label');
+
 
 // User Profile Elements
 const userProfileContainer = document.getElementById('user-profile-container');
@@ -1817,6 +1829,8 @@ function openOptions(e, id, name) {
             checkAllItems(id, false);
         };
     }
+
+    if (btnImport) btnImport.classList.remove('hidden');
 }
 
 function checkAllItems(listId, status) {
@@ -2356,6 +2370,299 @@ function setupListDragHandlers(element, index) {
 
 // function syncOrderToSheet(listId) { /* Removed logic handled by Supabase syncOrderToSheet above */ }
 
+// ===== IMPORT EXCEL / CSV =====
+
+let importParsedRows = [];  // Holds parsed rows ready to import
+let importTargetListId = null;
+
+function normalizeKey(str) {
+    // Lowercase + remove accents (e.g. "Tâche" → "tache", "Section" → "section")
+    return str.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '');
+}
+
+function openImportModal(listId) {
+    importTargetListId = listId;
+    importParsedRows = [];
+    resetImportModal();
+    if (importModal) {
+        importModal.classList.remove('hidden');
+        lucide.createIcons({ scope: importModal });
+    }
+}
+
+function closeImportModal() {
+    if (importModal) importModal.classList.add('hidden');
+    importTargetListId = null;
+    importParsedRows = [];
+    resetImportModal();
+}
+
+function resetImportModal() {
+    if (importFileInput) importFileInput.value = '';
+    if (importDropZone) {
+        importDropZone.classList.remove('file-selected', 'dragover');
+    }
+    if (importDropLabel) {
+        importDropLabel.innerHTML = 'Glissez un fichier ici<br><small>ou cliquez pour parcourir</small>';
+    }
+    if (importPreview) importPreview.classList.add('hidden');
+    if (importPreviewStats) importPreviewStats.innerHTML = '';
+    if (importPreviewList) importPreviewList.innerHTML = '';
+    if (btnImportConfirm) btnImportConfirm.disabled = true;
+}
+
+function parseCSV(text) {
+    const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+    if (lines.length < 2) return [];
+
+    // Detect separator: semicolon (French Excel export) or comma
+    const firstLine = lines[0];
+    const sep = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
+
+    const headers = firstLine.split(sep).map(h => h.replace(/^"|"$/g, '').trim());
+    const normHeaders = headers.map(normalizeKey);
+
+    const tacheIdx = normHeaders.findIndex(h => h === 'tache' || h === 'task' || h === 'tâche');
+    const sectionIdx = normHeaders.findIndex(h => h === 'section');
+
+    if (tacheIdx === -1) return null; // Column not found
+
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+        // Handle quoted fields
+        const cells = [];
+        let cur = '';
+        let inQuote = false;
+        for (let c = 0; c < lines[i].length; c++) {
+            const ch = lines[i][c];
+            if (ch === '"') { inQuote = !inQuote; continue; }
+            if (ch === sep && !inQuote) { cells.push(cur); cur = ''; continue; }
+            cur += ch;
+        }
+        cells.push(cur);
+
+        const tache = (cells[tacheIdx] || '').trim();
+        if (!tache) continue;
+        const section = sectionIdx >= 0 ? (cells[sectionIdx] || '').trim() : '';
+        rows.push({ section, tache });
+    }
+    return rows;
+}
+
+async function parseXLSX(file) {
+    // Lazy-load SheetJS only when needed
+    if (typeof XLSX === 'undefined') {
+        await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+                if (!jsonData.length) { resolve([]); return; }
+
+                // Normalize column names
+                const sample = jsonData[0];
+                const keyMap = {};
+                Object.keys(sample).forEach(k => { keyMap[normalizeKey(k)] = k; });
+
+                const tacheKey = keyMap['tache'] || keyMap['task'] || keyMap['tâche'];
+                const sectionKey = keyMap['section'];
+
+                if (!tacheKey) { resolve(null); return; }
+
+                const rows = jsonData
+                    .map(row => ({
+                        section: sectionKey ? String(row[sectionKey] || '').trim() : '',
+                        tache: String(row[tacheKey] || '').trim()
+                    }))
+                    .filter(r => r.tache !== '');
+
+                resolve(rows);
+            } catch (err) { reject(err); }
+        };
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+async function parseImportFile(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'csv') {
+        const text = await file.text();
+        return parseCSV(text);
+    } else if (ext === 'xlsx' || ext === 'xls') {
+        return await parseXLSX(file);
+    }
+    return null;
+}
+
+function renderImportPreview(rows) {
+    if (!rows || !importPreviewStats || !importPreviewList || !importPreview) return;
+
+    const sectionNames = [...new Set(rows.filter(r => r.section).map(r => r.section))];
+    const taskCount = rows.length;
+    const sectionCount = sectionNames.length;
+
+    importPreviewStats.innerHTML =
+        `<strong>${taskCount}</strong> tâche${taskCount > 1 ? 's' : ''} · ` +
+        `<strong>${sectionCount}</strong> section${sectionCount > 1 ? 's' : ''} détectée${sectionCount > 1 ? 's' : ''}`;
+
+    importPreviewList.innerHTML = '';
+    let lastSection = null;
+    rows.forEach(row => {
+        if (row.section && row.section !== lastSection) {
+            lastSection = row.section;
+            const el = document.createElement('div');
+            el.className = 'import-preview-item is-header';
+            el.innerHTML = `<span class="import-preview-dot"></span>${row.section}`;
+            importPreviewList.appendChild(el);
+        }
+        const el = document.createElement('div');
+        el.className = 'import-preview-item';
+        el.innerHTML = `<span class="import-preview-dot"></span>${row.tache}`;
+        importPreviewList.appendChild(el);
+    });
+
+    importPreview.classList.remove('hidden');
+}
+
+async function handleImportFile(file) {
+    if (!file) return;
+    if (importDropLabel) importDropLabel.textContent = `📄 ${file.name}`;
+    if (importDropZone) importDropZone.classList.add('file-selected');
+    if (btnImportConfirm) btnImportConfirm.disabled = true;
+    if (importPreview) importPreview.classList.add('hidden');
+
+    try {
+        const rows = await parseImportFile(file);
+        if (!rows) {
+            alert('Colonne "tache" introuvable. Vérifiez que votre fichier contient une colonne "tache" ou "task".');
+            resetImportModal();
+            return;
+        }
+        if (rows.length === 0) {
+            alert('Aucune tâche trouvée dans le fichier.');
+            resetImportModal();
+            return;
+        }
+        importParsedRows = rows;
+        renderImportPreview(rows);
+        if (btnImportConfirm) btnImportConfirm.disabled = false;
+    } catch (err) {
+        console.error('Import parse error:', err);
+        alert('Erreur lors de la lecture du fichier : ' + err.message);
+        resetImportModal();
+    }
+}
+
+async function importRowsToList(listId, rows) {
+    if (!listId || !rows || rows.length === 0) return;
+
+    // Build ordered list of items: group by section preserving order of appearance
+    const existingItems = state.items[listId] || [];
+    const startPosition = existingItems.length;
+
+    const itemsToInsert = [];
+    let position = startPosition;
+    let lastSection = null;
+
+    rows.forEach(row => {
+        // Insert section header if section changes
+        if (row.section && row.section !== lastSection) {
+            lastSection = row.section;
+            itemsToInsert.push({
+                list_id: listId,
+                text: row.section,
+                done: false,
+                is_header: true,
+                is_sub_header: false,
+                position: position++,
+                last_modifier: state.userEmail
+            });
+        }
+        // Insert task
+        itemsToInsert.push({
+            list_id: listId,
+            text: row.tache,
+            done: false,
+            is_header: false,
+            is_sub_header: false,
+            position: position++,
+            last_modifier: state.userEmail
+        });
+    });
+
+    try {
+        if (btnImportConfirm) { btnImportConfirm.disabled = true; btnImportConfirm.textContent = 'Import en cours...'; }
+
+        const { error } = await supabaseClient.from('tasks').insert(itemsToInsert);
+        if (error) throw error;
+
+        closeImportModal();
+        await fetchSupabaseData();
+        // Navigate to the list to show the result
+        if (state.view !== 'list' || state.activeListId !== listId) {
+            openList(listId);
+        }
+        playSound('add');
+    } catch (err) {
+        console.error('Import insert error:', err);
+        alert('Erreur lors de l\'import : ' + (err.message || JSON.stringify(err)));
+        if (btnImportConfirm) { btnImportConfirm.disabled = false; btnImportConfirm.innerHTML = '<i data-lucide="check"></i> Importer'; lucide.createIcons({ scope: btnImportConfirm }); }
+    }
+}
+
+// Import Modal Event Listeners
+if (importFileInput) {
+    importFileInput.addEventListener('change', (e) => {
+        if (e.target.files[0]) handleImportFile(e.target.files[0]);
+    });
+}
+
+if (importDropZone) {
+    importDropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        importDropZone.classList.add('dragover');
+    });
+    importDropZone.addEventListener('dragleave', () => {
+        importDropZone.classList.remove('dragover');
+    });
+    importDropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        importDropZone.classList.remove('dragover');
+        const file = e.dataTransfer?.files?.[0];
+        if (file) handleImportFile(file);
+    });
+}
+
+if (importModal) {
+    importModal.addEventListener('click', (e) => {
+        if (e.target === importModal) closeImportModal();
+    });
+}
+
+if (btnImportCancel) btnImportCancel.onclick = closeImportModal;
+
+if (btnImportConfirm) {
+    btnImportConfirm.onclick = () => {
+        if (importParsedRows.length > 0 && importTargetListId) {
+            importRowsToList(importTargetListId, importParsedRows);
+        }
+    };
+}
+
 // --- Event Listeners ---
 
 if (backButton) backButton.addEventListener('click', (e) => { if (e && e.preventDefault) e.preventDefault(); e.stopPropagation(); goHome(); });
@@ -2414,6 +2721,12 @@ if (btnDelete) btnDelete.onclick = () => {
 
 if (btnColor) btnColor.onclick = () => {
     openColorModal();
+};
+
+if (btnImport) btnImport.onclick = () => {
+    const listIdToImport = currentListId;
+    closeOptions();
+    openImportModal(listIdToImport);
 };
 
 if (btnLogout) btnLogout.onclick = handleLogout;
