@@ -112,5 +112,5 @@ Les clés Supabase sont configurées dans `index.html` (variables directement da
 ## ⏱️ Disponibilité du système
 
 <!-- UPTIME_BADGE_START -->
-🟢 **Système actif depuis : 271 jours** *(dernière vérification : 2026-11-09)*
+🟢 **Système actif depuis : 273 jours** *(dernière vérification : 2026-11-11)*
 <!-- UPTIME_BADGE_END -->
